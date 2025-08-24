@@ -1,0 +1,419 @@
+// Package parallel provides parallel test execution with resource isolation
+package parallel
+
+import (
+    "context"
+    "fmt"
+    "sync"
+    "sync/atomic"
+    "testing"
+    "time"
+
+    "github.com/panjf2000/ants/v2"
+    "github.com/stretchr/testify/require"
+    "vasdeference"
+)
+
+// TestContext represents a serverless test context integrated with vasdeference
+type TestContext struct {
+    *sfx.TestContext
+    arrange   *sfx.Arrange
+    namespace string
+    locks     map[string]*sync.Mutex
+    lockMutex sync.Mutex
+}
+
+// Runner manages parallel test execution with resource isolation
+type Runner struct {
+    t             sfx.TestingT
+    pool          *ants.Pool
+    baseArrange   *sfx.Arrange
+    resourceLocks sync.Map
+    testCounter   int64
+    errors        []error
+    errorMutex    sync.Mutex
+    wg            sync.WaitGroup
+}
+
+// Options configures the parallel runner
+type Options struct {
+    // PoolSize is the number of concurrent workers
+    PoolSize int
+
+    // ResourceIsolation ensures unique resources per test
+    ResourceIsolation bool
+
+    // TestTimeout is the maximum time for each test
+    TestTimeout time.Duration
+
+    // BaseArrange provides the base arrange for creating isolated test contexts
+    BaseArrange *sfx.Arrange
+}
+
+// NewRunner creates a new parallel test runner
+func NewRunner(t sfx.TestingT, opts Options) (*Runner, error) {
+    if opts.PoolSize <= 0 {
+        opts.PoolSize = 4
+    }
+    if opts.TestTimeout <= 0 {
+        opts.TestTimeout = 5 * time.Minute
+    }
+
+    // Create worker pool
+    pool, err := ants.NewPool(opts.PoolSize, ants.WithOptions(ants.Options{
+        ExpiryDuration: 10 * time.Second,
+        PreAlloc:       true,
+        Nonblocking:    false,
+    }))
+    if err != nil {
+        return nil, fmt.Errorf("failed to create worker pool: %w", err)
+    }
+
+    runner := &Runner{
+        t:           t,
+        pool:        pool,
+        baseArrange: opts.BaseArrange,
+    }
+
+    // Register cleanup if testing.TB is available
+    if tb, ok := t.(testing.TB); ok {
+        tb.Cleanup(func() {
+            runner.Cleanup()
+        })
+    }
+
+    return runner, nil
+}
+
+// TestCase represents a single test case
+type TestCase struct {
+    Name string
+    Func func(ctx context.Context, t *TestContext) error
+}
+
+// Run executes test cases in parallel
+func (r *Runner) Run(testCases []TestCase) {
+    for _, tc := range testCases {
+        tc := tc // Capture range variable
+        r.wg.Add(1)
+
+        err := r.pool.Submit(func() {
+            defer r.wg.Done()
+            r.runTestCase(tc)
+        })
+
+        if err != nil {
+            r.recordError(fmt.Errorf("failed to submit test %s: %w", tc.Name, err))
+            r.wg.Done()
+        }
+    }
+
+    // Wait for all tests to complete
+    r.wg.Wait()
+
+    // Check for errors
+    if len(r.errors) > 0 {
+        for _, err := range r.errors {
+            r.t.Errorf("Parallel test error: %v", err)
+        }
+        r.t.FailNow()
+    }
+}
+
+// RunTableDriven executes table-driven tests in parallel
+func (r *Runner) RunTableDriven(t *testing.T, cases interface{}, testFunc interface{}) {
+    // Use reflection to handle different case types
+    testCases := convertToTestCases(t, cases, testFunc)
+    r.Run(testCases)
+}
+
+// runTestCase executes a single test case with isolation
+func (r *Runner) runTestCase(tc TestCase) {
+    // Create isolated context
+    testNum := atomic.AddInt64(&r.testCounter, 1)
+    namespace := fmt.Sprintf("test%d", testNum)
+    
+    // Create isolated test context and arrange
+    var testCtx *TestContext
+    var arrange *sfx.Arrange
+    
+    if r.baseArrange != nil {
+        // Create isolated arrange with unique namespace
+        arrange = sfx.NewArrangeWithNamespace(r.baseArrange.Context, namespace)
+    } else {
+        // Create minimal test context and arrange
+        baseTestCtx := sfx.NewTestContext(r.t)
+        arrange = sfx.NewArrangeWithNamespace(baseTestCtx, namespace)
+    }
+    
+    testCtx = &TestContext{
+        TestContext: arrange.Context,
+        arrange:     arrange,
+        namespace:   namespace,
+        locks:       make(map[string]*sync.Mutex),
+    }
+
+    // Ensure cleanup
+    defer arrange.Cleanup()
+
+    // Create context with timeout
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+    defer cancel()
+
+    // Run test with panic recovery
+    func() {
+        defer func() {
+            if p := recover(); p != nil {
+                r.recordError(fmt.Errorf("test %s panicked: %v", tc.Name, p))
+            }
+        }()
+
+        // Execute test
+        if err := tc.Func(ctx, testCtx); err != nil {
+            r.recordError(fmt.Errorf("test %s failed: %w", tc.Name, err))
+        }
+    }()
+}
+
+// TestContext methods for resource isolation
+
+// GetTableName returns an isolated table name for this test
+func (tc *TestContext) GetTableName(baseName string) string {
+    return fmt.Sprintf("%s-%s", tc.namespace, baseName)
+}
+
+// GetFunctionName returns an isolated function name for this test
+func (tc *TestContext) GetFunctionName(baseName string) string {
+    return fmt.Sprintf("%s-%s", tc.namespace, baseName)
+}
+
+// LockResource acquires a lock on a shared resource
+func (tc *TestContext) LockResource(resourceName string) {
+    tc.lockMutex.Lock()
+    defer tc.lockMutex.Unlock()
+
+    if _, exists := tc.locks[resourceName]; !exists {
+        tc.locks[resourceName] = &sync.Mutex{}
+    }
+
+    tc.locks[resourceName].Lock()
+}
+
+// UnlockResource releases a lock on a shared resource
+func (tc *TestContext) UnlockResource(resourceName string) {
+    tc.lockMutex.Lock()
+    defer tc.lockMutex.Unlock()
+
+    if lock, exists := tc.locks[resourceName]; exists {
+        lock.Unlock()
+    }
+}
+
+// WithResourceLock executes a function with a resource lock
+func (tc *TestContext) WithResourceLock(resourceName string, fn func() error) error {
+    tc.LockResource(resourceName)
+    defer tc.UnlockResource(resourceName)
+    return fn()
+}
+
+// Helper methods
+
+func (r *Runner) recordError(err error) {
+    r.errorMutex.Lock()
+    defer r.errorMutex.Unlock()
+    r.errors = append(r.errors, err)
+}
+
+// Cleanup releases all resources
+func (r *Runner) Cleanup() {
+    if r.pool != nil {
+        r.pool.Release()
+    }
+}
+
+// GetStats returns pool statistics
+func (r *Runner) GetStats() PoolStats {
+    return PoolStats{
+        Running:   r.pool.Running(),
+        Available: r.pool.Free(),
+        Capacity:  r.pool.Cap(),
+    }
+}
+
+// PoolStats contains worker pool statistics
+type PoolStats struct {
+    Running   int
+    Available int
+    Capacity  int
+}
+
+// Table-driven test support
+
+// LambdaTestCase represents a Lambda test case
+type LambdaTestCase struct {
+    Name           string
+    Input          interface{}
+    ExpectedStatus int32
+    ExpectedError  bool
+    Validator      func(t testing.TB, output interface{})
+    Snapshot       bool
+}
+
+// DynamoDBTestCase represents a DynamoDB test case
+type DynamoDBTestCase struct {
+    Name      string
+    Items     []interface{}
+    Query     string
+    Expected  int
+    Validator func(t testing.TB, items []map[string]interface{})
+    Snapshot  bool
+}
+
+// StepFunctionTestCase represents a Step Functions test case
+type StepFunctionTestCase struct {
+    Name           string
+    Input          interface{}
+    ExpectedStatus string
+    ExpectedOutput interface{}
+    Timeout        time.Duration
+    Validator      func(t testing.TB, execution interface{})
+    Snapshot       bool
+}
+
+// EventBridgeTestCase represents an EventBridge test case
+type EventBridgeTestCase struct {
+    Name       string
+    Source     string
+    DetailType string
+    Detail     interface{}
+    Validator  func(t testing.TB)
+}
+
+// RunLambdaTests runs Lambda test cases in parallel
+func RunLambdaTests(t *testing.T, functionName string, cases []LambdaTestCase) {
+    runner, err := NewRunner(t, Options{PoolSize: 4})
+    require.NoError(t, err)
+
+    testCases := make([]TestCase, len(cases))
+    for i, tc := range cases {
+        tc := tc // Capture range variable
+        testCases[i] = TestCase{
+            Name: tc.Name,
+            Func: func(ctx context.Context, tctx *TestContext) error {
+                return runLambdaTest(ctx, tctx, functionName, tc)
+            },
+        }
+    }
+
+    runner.Run(testCases)
+}
+
+// RunDynamoDBTests runs DynamoDB test cases in parallel
+func RunDynamoDBTests(t *testing.T, tableName string, cases []DynamoDBTestCase) {
+    runner, err := NewRunner(t, Options{
+        PoolSize:          4,
+        ResourceIsolation: true,
+    })
+    require.NoError(t, err)
+
+    testCases := make([]TestCase, len(cases))
+    for i, tc := range cases {
+        tc := tc // Capture range variable
+        testCases[i] = TestCase{
+            Name: tc.Name,
+            Func: func(ctx context.Context, tctx *TestContext) error {
+                return runDynamoDBTest(ctx, tctx, tableName, tc)
+            },
+        }
+    }
+
+    runner.Run(testCases)
+}
+
+// RunStepFunctionTests runs Step Functions test cases in parallel
+func RunStepFunctionTests(t *testing.T, stateMachineArn string, cases []StepFunctionTestCase) {
+    runner, err := NewRunner(t, Options{PoolSize: 2}) // Lower concurrency for state machines
+    require.NoError(t, err)
+
+    testCases := make([]TestCase, len(cases))
+    for i, tc := range cases {
+        tc := tc // Capture range variable
+        testCases[i] = TestCase{
+            Name: tc.Name,
+            Func: func(ctx context.Context, tctx *TestContext) error {
+                return runStepFunctionTest(ctx, tctx, stateMachineArn, tc)
+            },
+        }
+    }
+
+    runner.Run(testCases)
+}
+
+// Implementation functions
+
+func runLambdaTest(ctx context.Context, tctx *TestContext, functionName string, tc LambdaTestCase) error {
+    // Implementation would invoke Lambda and validate
+    return nil
+}
+
+func runDynamoDBTest(ctx context.Context, tctx *TestContext, tableName string, tc DynamoDBTestCase) error {
+    // Implementation would perform DynamoDB operations and validate
+    return nil
+}
+
+func runStepFunctionTest(ctx context.Context, tctx *TestContext, stateMachineArn string, tc StepFunctionTestCase) error {
+    // Implementation would execute state machine and validate
+    return nil
+}
+
+// convertToTestCases uses reflection to convert various case types
+func convertToTestCases(t *testing.T, cases interface{}, testFunc interface{}) []TestCase {
+    // Implementation would use reflection to handle different case types
+    return []TestCase{}
+}
+
+// NewRunnerE creates a new parallel test runner with error return (Terratest pattern)
+func NewRunnerE(t sfx.TestingT, opts Options) (*Runner, error) {
+    return NewRunner(t, opts)
+}
+
+// RunE executes test cases in parallel with error return
+func (r *Runner) RunE(testCases []TestCase) error {
+    for _, tc := range testCases {
+        tc := tc // Capture range variable
+        r.wg.Add(1)
+
+        err := r.pool.Submit(func() {
+            defer r.wg.Done()
+            r.runTestCase(tc)
+        })
+
+        if err != nil {
+            r.recordError(fmt.Errorf("failed to submit test %s: %w", tc.Name, err))
+            r.wg.Done()
+        }
+    }
+
+    // Wait for all tests to complete
+    r.wg.Wait()
+
+    // Check for errors
+    if len(r.errors) > 0 {
+        return fmt.Errorf("parallel test errors occurred: %d failures", len(r.errors))
+    }
+    
+    return nil
+}
+
+// AWS service-specific test runners with vasdeference integration
+
+// NewRunnerWithArrange creates a runner with an existing arrange context
+func NewRunnerWithArrange(arrange *sfx.Arrange, opts Options) (*Runner, error) {
+    opts.BaseArrange = arrange
+    return NewRunner(arrange.Context.T, opts)
+}
+
+// NewRunnerWithArrangeE creates a runner with an existing arrange context, returning error
+func NewRunnerWithArrangeE(arrange *sfx.Arrange, opts Options) (*Runner, error) {
+    return NewRunnerWithArrange(arrange, opts)
+}

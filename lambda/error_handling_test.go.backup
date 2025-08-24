@@ -1,0 +1,684 @@
+package lambda
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
+
+// Test suite for error handling and edge cases
+func TestInvokeE_NetworkTimeout(t *testing.T) {
+	// Given: Network timeout scenario
+	ctx := createTestContext()
+	functionName := "test-function"
+	payload := `{"key": "value"}`
+	
+	mockClient := &MockLambdaClient{}
+	mockClient.On("Invoke", mock.Anything, mock.AnythingOfType("*lambda.InvokeInput"), mock.Anything).
+		Return(nil, context.DeadlineExceeded)
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Invoking with network timeout
+	result, err := InvokeE(ctx, functionName, payload)
+	
+	// Then: Should return timeout error
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), ErrInvocationFailed.Error())
+	assert.Nil(t, result)
+	
+	mockClient.AssertExpectations(t)
+}
+
+func TestInvokeE_PayloadTooLarge(t *testing.T) {
+	// Given: Payload that exceeds size limit
+	ctx := createTestContext()
+	functionName := "test-function"
+	largePayload := strings.Repeat("x", MaxPayloadSize+1) // Exceed max size
+	
+	// When: Invoking with oversized payload
+	result, err := InvokeE(ctx, functionName, largePayload)
+	
+	// Then: Should return validation error
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "payload size exceeds maximum")
+	assert.Nil(t, result)
+}
+
+func TestInvokeE_ThrottlingError(t *testing.T) {
+	// Given: Throttling error from AWS
+	ctx := createTestContext()
+	functionName := "test-function"
+	payload := `{"key": "value"}`
+	
+	throttleError := &lambdaTypes.TooManyRequestsException{
+		Type:    aws.String("User"),
+		Message: aws.String("Rate exceeded"),
+	}
+	
+	mockClient := &MockLambdaClient{}
+	mockClient.On("Invoke", mock.Anything, mock.AnythingOfType("*lambda.InvokeInput"), mock.Anything).
+		Return(nil, throttleError)
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Invoking with throttling error
+	result, err := InvokeE(ctx, functionName, payload)
+	
+	// Then: Should return error (this error is retryable)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), ErrInvocationFailed.Error())
+	assert.Nil(t, result)
+	
+	mockClient.AssertExpectations(t)
+}
+
+func TestInvokeWithRetryE_EventualSuccess(t *testing.T) {
+	// Given: Function that fails first time then succeeds
+	ctx := createTestContext()
+	functionName := "test-function"
+	payload := `{"key": "value"}`
+	
+	throttleError := &lambdaTypes.TooManyRequestsException{
+		Type:    aws.String("User"),
+		Message: aws.String("Rate exceeded"),
+	}
+	successResult := createSuccessfulInvokeOutput(`{"result": "success"}`)
+	
+	mockClient := &MockLambdaClient{}
+	// First call fails with throttling
+	mockClient.On("Invoke", mock.Anything, mock.AnythingOfType("*lambda.InvokeInput"), mock.Anything).
+		Return(nil, throttleError).Once()
+	// Second call succeeds
+	mockClient.On("Invoke", mock.Anything, mock.AnythingOfType("*lambda.InvokeInput"), mock.Anything).
+		Return(successResult, nil).Once()
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Invoking with retry
+	result, err := InvokeWithRetryE(ctx, functionName, payload, 2)
+	
+	// Then: Should eventually succeed
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, int32(200), result.StatusCode)
+	assert.Equal(t, `{"result": "success"}`, result.Payload)
+	
+	mockClient.AssertExpectations(t)
+}
+
+func TestInvokeWithRetryE_NonRetryableError(t *testing.T) {
+	// Given: Non-retryable error
+	ctx := createTestContext()
+	functionName := "test-function"
+	payload := `{"key": "value"}`
+	
+	nonRetryableError := &lambdaTypes.InvalidParameterValueException{
+		Type:    aws.String("User"),
+		Message: aws.String("Invalid parameter value"),
+	}
+	
+	mockClient := &MockLambdaClient{}
+	mockClient.On("Invoke", mock.Anything, mock.AnythingOfType("*lambda.InvokeInput"), mock.Anything).
+		Return(nil, nonRetryableError).Once() // Should only be called once
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Invoking with retry
+	result, err := InvokeWithRetryE(ctx, functionName, payload, 3)
+	
+	// Then: Should fail immediately without retries
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	
+	mockClient.AssertExpectations(t)
+}
+
+func TestGetFunctionE_ServiceUnavailable(t *testing.T) {
+	// Given: Service unavailable error
+	ctx := createTestContext()
+	functionName := "test-function"
+	
+	serviceError := &lambdaTypes.ServiceException{
+		Type:    aws.String("Service"),
+		Message: aws.String("Service is temporarily unavailable"),
+	}
+	
+	mockClient := &MockLambdaClient{}
+	mockClient.On("GetFunction", mock.Anything, mock.AnythingOfType("*lambda.GetFunctionInput"), mock.Anything).
+		Return(nil, serviceError)
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Getting function with service error
+	config, err := GetFunctionE(ctx, functionName)
+	
+	// Then: Should return error
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get function configuration")
+	assert.Nil(t, config)
+	
+	mockClient.AssertExpectations(t)
+}
+
+func TestWaitForFunctionActiveE_Timeout(t *testing.T) {
+	// Given: Function that never becomes active
+	ctx := createTestContext()
+	functionName := "test-function"
+	
+	pendingConfig := createTestFunctionConfiguration(functionName)
+	pendingConfig.State = lambdaTypes.StatePending
+	expectedOutput := &lambda.GetFunctionOutput{
+		Configuration: pendingConfig,
+	}
+	
+	mockClient := &MockLambdaClient{}
+	// Always return pending state
+	mockClient.On("GetFunction", mock.Anything, mock.AnythingOfType("*lambda.GetFunctionInput"), mock.Anything).
+		Return(expectedOutput, nil).Maybe() // May be called multiple times
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Waiting for function to become active with short timeout
+	err := WaitForFunctionActiveE(ctx, functionName, 1*time.Second)
+	
+	// Then: Should timeout
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "timeout waiting for function")
+	
+	mockClient.AssertExpectations(t)
+}
+
+func TestCreateFunctionE_FunctionAlreadyExists(t *testing.T) {
+	// Given: Function that already exists
+	ctx := createTestContext()
+	functionName := "existing-function"
+	
+	input := &lambda.CreateFunctionInput{
+		FunctionName: aws.String(functionName),
+		Runtime:      lambdaTypes.RuntimeNodejs18x,
+		Handler:      aws.String("index.handler"),
+		Role:         aws.String("arn:aws:iam::123456789012:role/lambda-role"),
+		Code: &lambdaTypes.FunctionCode{
+			ZipFile: []byte("fake-zip-content"),
+		},
+	}
+	
+	conflictError := &lambdaTypes.ResourceConflictException{
+		Type:    aws.String("User"),
+		Message: aws.String("Function already exists"),
+	}
+	
+	mockClient := &MockLambdaClient{}
+	mockClient.On("CreateFunction", mock.Anything, input, mock.Anything).
+		Return(nil, conflictError)
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Creating existing function
+	config, err := CreateFunctionE(ctx, input)
+	
+	// Then: Should return conflict error
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create function")
+	assert.Nil(t, config)
+	
+	mockClient.AssertExpectations(t)
+}
+
+func TestDeleteFunctionE_FunctionNotFound(t *testing.T) {
+	// Given: Function that doesn't exist
+	ctx := createTestContext()
+	functionName := "non-existent-function"
+	
+	notFoundError := &lambdaTypes.ResourceNotFoundException{
+		Type:    aws.String("User"),
+		Message: aws.String("Function not found"),
+	}
+	
+	mockClient := &MockLambdaClient{}
+	mockClient.On("DeleteFunction", mock.Anything, mock.AnythingOfType("*lambda.DeleteFunctionInput"), mock.Anything).
+		Return(nil, notFoundError)
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Deleting non-existent function
+	err := DeleteFunctionE(ctx, functionName)
+	
+	// Then: Should return error
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to delete function")
+	
+	mockClient.AssertExpectations(t)
+}
+
+// Test edge cases for validation functions
+func TestValidateFunctionName_EdgeCases(t *testing.T) {
+	testCases := []struct {
+		name         string
+		functionName string
+		expectError  bool
+		errorMsg     string
+	}{
+		{"exactly 64 chars", strings.Repeat("a", 64), false, ""},
+		{"65 chars", strings.Repeat("a", 65), true, "name too long"},
+		{"starts with number", "1test", false, ""},
+		{"only numbers", "123456", false, ""},
+		{"only dashes", "------", false, ""},
+		{"only underscores", "______", false, ""},
+		{"special chars", "test$function", true, "invalid character"},
+		{"unicode chars", "test函数", true, "invalid character"},
+		{"newline", "test\nfunction", true, "invalid character"},
+		{"tab", "test\tfunction", true, "invalid character"},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// When: Validating function name
+			err := validateFunctionName(tc.functionName)
+			
+			// Then: Should match expectation
+			if tc.expectError {
+				assert.Error(t, err, "Expected error for: %s", tc.functionName)
+				if tc.errorMsg != "" {
+					assert.Contains(t, err.Error(), tc.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err, "Expected no error for: %s", tc.functionName)
+			}
+		})
+	}
+}
+
+func TestValidatePayload_EdgeCases(t *testing.T) {
+	testCases := []struct {
+		name        string
+		payload     string
+		expectError bool
+	}{
+		{"very large valid JSON", `{"key":"` + strings.Repeat("x", 1000) + `"}`, false},
+		{"deeply nested JSON", `{"a":{"b":{"c":{"d":{"e":"value"}}}}}`, false},
+		{"array with many elements", `[` + strings.Repeat(`"item",`, 100) + `"last"]`, false},
+		{"empty string", `""`, false},
+		{"zero", `0`, false},
+		{"false", `false`, false},
+		{"null", `null`, false},
+		{"just whitespace", "   ", true},
+		{"trailing comma", `{"key": "value",}`, true},
+		{"single quotes", `{'key': 'value'}`, true},
+		{"unescaped quotes", `{"key": "value with "quotes""}`, true},
+		{"control characters", "{\"key\": \"value\n\"}", false}, // Valid JSON with newline
+		{"binary data", string([]byte{0, 1, 2, 3, 4, 5}), true},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// When: Validating payload
+			err := validatePayload(tc.payload)
+			
+			// Then: Should match expectation
+			if tc.expectError {
+				assert.Error(t, err, "Expected error for: %s", tc.name)
+			} else {
+				assert.NoError(t, err, "Expected no error for: %s", tc.name)
+			}
+		})
+	}
+}
+
+// Test error handling in utility functions
+func TestParseInvokeOutputE_EdgeCases(t *testing.T) {
+	testCases := []struct {
+		name        string
+		result      *InvokeResult
+		target      interface{}
+		expectError bool
+	}{
+		{
+			"nil result",
+			nil,
+			&map[string]interface{}{},
+			true,
+		},
+		{
+			"empty payload",
+			&InvokeResult{StatusCode: 200, Payload: ""},
+			&map[string]interface{}{},
+			true,
+		},
+		{
+			"nil target",
+			&InvokeResult{StatusCode: 200, Payload: `{"key": "value"}`},
+			nil,
+			true,
+		},
+		{
+			"incompatible target type",
+			&InvokeResult{StatusCode: 200, Payload: `{"key": "value"}`},
+			new(int), // Can't unmarshal object into int
+			true,
+		},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// When: Parsing invoke output
+			err := ParseInvokeOutputE(tc.result, tc.target)
+			
+			// Then: Should match expectation
+			if tc.expectError {
+				assert.Error(t, err, "Expected error for: %s", tc.name)
+			} else {
+				assert.NoError(t, err, "Expected no error for: %s", tc.name)
+			}
+		})
+	}
+}
+
+func TestMarshalPayloadE_EdgeCases(t *testing.T) {
+	testCases := []struct {
+		name        string
+		input       interface{}
+		expectError bool
+	}{
+		{"nil", nil, false},
+		{"chan type", make(chan int), true},  // Channels can't be marshaled
+		{"func type", func() {}, true},       // Functions can't be marshaled
+		{"complex type", complex(1, 2), true}, // Complex numbers not supported in JSON
+		{"map with invalid key", map[complex64]string{complex(1, 2): "value"}, true},
+		{"circular reference", createCircularReference(), true},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// When: Marshaling payload
+			result, err := MarshalPayloadE(tc.input)
+			
+			// Then: Should match expectation
+			if tc.expectError {
+				assert.Error(t, err, "Expected error for: %s", tc.name)
+				assert.Empty(t, result)
+			} else {
+				assert.NoError(t, err, "Expected no error for: %s", tc.name)
+			}
+		})
+	}
+}
+
+// Helper function to create circular reference
+func createCircularReference() map[string]interface{} {
+	m := make(map[string]interface{})
+	m["self"] = m // Creates circular reference
+	return m
+}
+
+// Test error handling in event builders
+func TestBuildS3EventE_EdgeCases(t *testing.T) {
+	testCases := []struct {
+		name        string
+		bucketName  string
+		objectKey   string
+		eventName   string
+		expectError bool
+	}{
+		{"very long bucket name", strings.Repeat("a", 1000), "key", "event", false},
+		{"very long object key", "bucket", strings.Repeat("a", 1000), "event", false},
+		{"bucket with special chars", "bucket-name_123", "key", "event", false},
+		{"key with special chars", "bucket", "path/to/file with spaces.txt", "event", false},
+		{"unicode bucket name", "bucket", "key", "event", false},
+		{"unicode object key", "bucket", "测试文件.txt", "event", false},
+		{"empty event name defaults", "bucket", "key", "", false},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// When: Building S3 event
+			eventJSON, err := BuildS3EventE(tc.bucketName, tc.objectKey, tc.eventName)
+			
+			// Then: Should match expectation
+			if tc.expectError {
+				assert.Error(t, err, "Expected error for: %s", tc.name)
+				assert.Empty(t, eventJSON)
+			} else {
+				assert.NoError(t, err, "Expected no error for: %s", tc.name)
+				assert.NotEmpty(t, eventJSON)
+				// Should produce valid JSON
+				assert.NoError(t, validatePayload(eventJSON))
+			}
+		})
+	}
+}
+
+func TestEventBuilder_MalformedInput(t *testing.T) {
+	// Test that event builders handle various malformed inputs gracefully
+	
+	// Test BuildDynamoDBEvent with nil keys
+	eventJSON, err := BuildDynamoDBEventE("table", "INSERT", nil)
+	require.NoError(t, err)
+	assert.NotEmpty(t, eventJSON)
+	
+	// Test BuildSQSEvent with empty message body (should use default)
+	eventJSON, err = BuildSQSEventE("https://sqs.us-east-1.amazonaws.com/123456789012/queue", "")
+	require.NoError(t, err)
+	assert.NotEmpty(t, eventJSON)
+	assert.Contains(t, eventJSON, "Hello from SQS!")
+	
+	// Test BuildSNSEvent with empty message (should use default)
+	eventJSON, err = BuildSNSEventE("arn:aws:sns:us-east-1:123456789012:topic", "")
+	require.NoError(t, err)
+	assert.NotEmpty(t, eventJSON)
+	assert.Contains(t, eventJSON, "Hello from SNS!")
+	
+	// Test BuildAPIGatewayEvent with empty parameters (should use defaults)
+	eventJSON, err = BuildAPIGatewayEventE("", "", "")
+	require.NoError(t, err)
+	assert.NotEmpty(t, eventJSON)
+	assert.Contains(t, eventJSON, `"httpMethod":"GET"`)
+	assert.Contains(t, eventJSON, `"path":"/"`)
+}
+
+// Test concurrent access and thread safety
+func TestConcurrentInvocations(t *testing.T) {
+	// Given: Multiple concurrent invocation attempts
+	ctx := createTestContext()
+	functionName := "test-function"
+	payload := `{"key": "value"}`
+	
+	successResult := createSuccessfulInvokeOutput(`{"result": "success"}`)
+	
+	mockClient := &MockLambdaClient{}
+	// Allow multiple concurrent calls
+	mockClient.On("Invoke", mock.Anything, mock.AnythingOfType("*lambda.InvokeInput"), mock.Anything).
+		Return(successResult, nil).Times(10)
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Making concurrent invocations
+	const numGoroutines = 10
+	errors := make(chan error, numGoroutines)
+	
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			_, err := InvokeE(ctx, functionName, payload)
+			errors <- err
+		}()
+	}
+	
+	// Then: All invocations should succeed
+	for i := 0; i < numGoroutines; i++ {
+		select {
+		case err := <-errors:
+			assert.NoError(t, err, "Concurrent invocation %d failed", i)
+		case <-time.After(5 * time.Second):
+			t.Fatal("Timeout waiting for concurrent invocation to complete")
+		}
+	}
+	
+	mockClient.AssertExpectations(t)
+}
+
+// Test memory and resource cleanup
+func TestResourceCleanup(t *testing.T) {
+	// Test that resources are properly cleaned up after operations
+	ctx := createTestContext()
+	functionName := "test-function"
+	payload := `{"key": "value"}`
+	
+	successResult := createSuccessfulInvokeOutput(`{"result": "success"}`)
+	
+	mockClient := &MockLambdaClient{}
+	mockClient.On("Invoke", mock.Anything, mock.AnythingOfType("*lambda.InvokeInput"), mock.Anything).
+		Return(successResult, nil)
+	
+	// Mock client creation
+	originalCreateClient := createLambdaClient
+	createLambdaClient = func(*TestContext) *lambda.Client {
+		return (*lambda.Client)(mockClient)
+	}
+	defer func() { createLambdaClient = originalCreateClient }()
+	
+	// When: Performing multiple operations in succession
+	for i := 0; i < 100; i++ {
+		result, err := InvokeE(ctx, functionName, payload)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		
+		// Simulate some processing
+		_ = result.Payload
+	}
+	
+	// Then: Should not cause memory leaks or resource exhaustion
+	// This is more of a smoke test - in real scenarios you'd use profiling tools
+	mockClient.AssertExpectations(t)
+}
+
+// Test boundary conditions
+func TestBoundaryConditions(t *testing.T) {
+	// Test various boundary conditions
+	
+	// Test maximum retry attempts
+	config := defaultRetryConfig()
+	config.MaxAttempts = 1000 // Very high number
+	
+	delay := calculateBackoffDelay(999, config)
+	assert.Equal(t, config.MaxDelay, delay, "Should cap at max delay")
+	
+	// Test zero retry attempts
+	config.MaxAttempts = 0
+	delay = calculateBackoffDelay(0, config)
+	assert.Equal(t, config.BaseDelay, delay, "Should use base delay for zero attempts")
+	
+	// Test negative values
+	delay = calculateBackoffDelay(-1, config)
+	assert.Equal(t, config.BaseDelay, delay, "Should handle negative attempts gracefully")
+}
+
+// Test string utility functions edge cases
+func TestStringUtilityEdgeCases(t *testing.T) {
+	// Test contains function with edge cases
+	testCases := []struct {
+		s        string
+		substr   string
+		expected bool
+	}{
+		{"", "", true},         // Empty strings
+		{"", "a", false},       // Empty string, non-empty substr
+		{"a", "", true},        // Non-empty string, empty substr
+		{"hello", "hello", true}, // Exact match
+		{"hello", "hell", true},  // Prefix
+		{"hello", "ello", true},  // Suffix
+		{"hello", "ell", true},   // Middle
+		{"hello", "Hello", false}, // Case sensitive
+		{"hello", "world", false}, // No match
+		{"a", "aa", false},       // Substr longer than string
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.s+"_contains_"+tc.substr, func(t *testing.T) {
+			result := contains(tc.s, tc.substr)
+			assert.Equal(t, tc.expected, result, 
+				"contains(%q, %q) = %v, expected %v", tc.s, tc.substr, result, tc.expected)
+		})
+	}
+}
+
+func TestIndexOfEdgeCases(t *testing.T) {
+	// Test indexOf function with edge cases
+	testCases := []struct {
+		s        string
+		substr   string
+		expected int
+	}{
+		{"", "", 0},           // Empty strings
+		{"", "a", -1},         // Empty string, non-empty substr
+		{"a", "", 0},          // Non-empty string, empty substr
+		{"hello", "h", 0},     // First character
+		{"hello", "o", 4},     // Last character
+		{"hello", "ll", 2},    // Middle
+		{"hello", "Hello", -1}, // Case sensitive
+		{"hello", "world", -1}, // No match
+		{"aaaa", "aa", 0},     // Multiple matches, returns first
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.s+"_indexOf_"+tc.substr, func(t *testing.T) {
+			result := indexOf(tc.s, tc.substr)
+			assert.Equal(t, tc.expected, result,
+				"indexOf(%q, %q) = %v, expected %v", tc.s, tc.substr, result, tc.expected)
+		})
+	}
+}
