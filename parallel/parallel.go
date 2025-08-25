@@ -17,10 +17,9 @@ import (
 // TestContext represents a serverless test context integrated with vasdeference
 type TestContext struct {
     *vasdeference.TestContext
-    arrange   *vasdeference.Arrange
-    namespace string
-    locks     map[string]*sync.Mutex
-    lockMutex sync.Mutex
+    arrange      *vasdeference.Arrange
+    namespace    string
+    runner       *Runner
 }
 
 // Runner manages parallel test execution with resource isolation
@@ -152,7 +151,7 @@ func (r *Runner) runTestCase(tc TestCase) {
         TestContext: arrange.Context,
         arrange:     arrange,
         namespace:   namespace,
-        locks:       make(map[string]*sync.Mutex),
+        runner:      r,
     }
 
     // Ensure cleanup
@@ -191,23 +190,18 @@ func (tc *TestContext) GetFunctionName(baseName string) string {
 
 // LockResource acquires a lock on a shared resource
 func (tc *TestContext) LockResource(resourceName string) {
-    tc.lockMutex.Lock()
-    defer tc.lockMutex.Unlock()
-
-    if _, exists := tc.locks[resourceName]; !exists {
-        tc.locks[resourceName] = &sync.Mutex{}
-    }
-
-    tc.locks[resourceName].Lock()
+    // Get or create mutex for this resource from the shared runner's resource locks
+    mutexInterface, _ := tc.runner.resourceLocks.LoadOrStore(resourceName, &sync.Mutex{})
+    mutex := mutexInterface.(*sync.Mutex)
+    mutex.Lock()
 }
 
 // UnlockResource releases a lock on a shared resource
 func (tc *TestContext) UnlockResource(resourceName string) {
-    tc.lockMutex.Lock()
-    defer tc.lockMutex.Unlock()
-
-    if lock, exists := tc.locks[resourceName]; exists {
-        lock.Unlock()
+    // Load the mutex from the shared runner's resource locks
+    if mutexInterface, exists := tc.runner.resourceLocks.Load(resourceName); exists {
+        mutex := mutexInterface.(*sync.Mutex)
+        mutex.Unlock()
     }
 }
 

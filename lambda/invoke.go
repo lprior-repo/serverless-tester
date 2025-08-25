@@ -150,6 +150,7 @@ func DryRunInvokeE(ctx *TestContext, functionName string, payload string) (*Invo
 // executeInvokeWithTerratestRetry handles the actual invocation using Terratest retry patterns
 func executeInvokeWithTerratestRetry(ctx *TestContext, client LambdaClientInterface, functionName string, payload string, opts InvokeOptions) (*InvokeResult, error) {
 	var result *InvokeResult
+	var lastError error
 	
 	description := fmt.Sprintf("Invoke Lambda function %s", functionName)
 	
@@ -162,6 +163,7 @@ func executeInvokeWithTerratestRetry(ctx *TestContext, client LambdaClientInterf
 		func() (string, error) {
 			r, err := executeInvoke(client, functionName, payload, opts)
 			if err != nil {
+				lastError = err
 				// Don't retry for certain errors
 				if isNonRetryableError(err) {
 					return "", retry.FatalError{Underlying: err}
@@ -169,9 +171,18 @@ func executeInvokeWithTerratestRetry(ctx *TestContext, client LambdaClientInterf
 				return "", err
 			}
 			result = r
+			lastError = nil
 			return "success", nil
 		},
 	)
+	
+	// If result is nil, it means all retries failed
+	if result == nil {
+		if lastError != nil {
+			return nil, lastError
+		}
+		return nil, fmt.Errorf("invoke failed after %d retries", opts.MaxRetries)
+	}
 	
 	return result, nil
 }

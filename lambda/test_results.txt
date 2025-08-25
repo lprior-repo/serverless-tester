@@ -1,0 +1,153 @@
+=== RUN   TestValidateFunctionName_WithEmptyName_ShouldReturnError
+--- PASS: TestValidateFunctionName_WithEmptyName_ShouldReturnError (0.00s)
+=== RUN   TestValidateFunctionName_WithValidName_ShouldReturnNil
+--- PASS: TestValidateFunctionName_WithValidName_ShouldReturnNil (0.00s)
+=== RUN   TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError
+=== RUN   TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid@name
+=== RUN   TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid#name
+=== RUN   TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid_name
+=== RUN   TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid.name
+=== RUN   TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid$name
+--- PASS: TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError (0.00s)
+    --- PASS: TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid@name (0.00s)
+    --- PASS: TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid#name (0.00s)
+    --- PASS: TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid_name (0.00s)
+    --- PASS: TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid.name (0.00s)
+    --- PASS: TestValidateFunctionName_WithInvalidCharacters_ShouldReturnError/InvalidName_invalid$name (0.00s)
+=== RUN   TestValidateFunctionName_WithTooLongName_ShouldReturnError
+--- PASS: TestValidateFunctionName_WithTooLongName_ShouldReturnError (0.00s)
+=== RUN   TestValidatePayload_WithEmptyPayload_ShouldReturnNil
+--- PASS: TestValidatePayload_WithEmptyPayload_ShouldReturnNil (0.00s)
+=== RUN   TestValidatePayload_WithValidJSON_ShouldReturnNil
+=== RUN   TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_{"test":_"value"}
+=== RUN   TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_[]
+=== RUN   TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_"string"
+=== RUN   TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_123
+=== RUN   TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_true
+=== RUN   TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_null
+--- PASS: TestValidatePayload_WithValidJSON_ShouldReturnNil (0.00s)
+    --- PASS: TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_{"test":_"value"} (0.00s)
+    --- PASS: TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_[] (0.00s)
+    --- PASS: TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_"string" (0.00s)
+    --- PASS: TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_123 (0.00s)
+    --- PASS: TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_true (0.00s)
+    --- PASS: TestValidatePayload_WithValidJSON_ShouldReturnNil/ValidPayload_null (0.00s)
+=== RUN   TestValidatePayload_WithInvalidJSON_ShouldReturnError
+=== RUN   TestValidatePayload_WithInvalidJSON_ShouldReturnError/InvalidPayload_{"test":_invalid}
+=== RUN   TestValidatePayload_WithInvalidJSON_ShouldReturnError/InvalidPayload_{broken_json}
+=== RUN   TestValidatePayload_WithInvalidJSON_ShouldReturnError/InvalidPayload_{"unclosed":_
+=== RUN   TestValidatePayload_WithInvalidJSON_ShouldReturnError/InvalidPayload_invalid
+--- PASS: TestValidatePayload_WithInvalidJSON_ShouldReturnError (0.00s)
+    --- PASS: TestValidatePayload_WithInvalidJSON_ShouldReturnError/InvalidPayload_{"test":_invalid} (0.00s)
+    --- PASS: TestValidatePayload_WithInvalidJSON_ShouldReturnError/InvalidPayload_{broken_json} (0.00s)
+    --- PASS: TestValidatePayload_WithInvalidJSON_ShouldReturnError/InvalidPayload_{"unclosed":_ (0.00s)
+    --- PASS: TestValidatePayload_WithInvalidJSON_ShouldReturnError/InvalidPayload_invalid (0.00s)
+=== RUN   TestDefaultInvokeOptions_ShouldReturnCorrectDefaults
+--- PASS: TestDefaultInvokeOptions_ShouldReturnCorrectDefaults (0.00s)
+=== RUN   TestMergeInvokeOptions_WithNilInput_ShouldReturnDefaults
+--- PASS: TestMergeInvokeOptions_WithNilInput_ShouldReturnDefaults (0.00s)
+=== RUN   TestMergeInvokeOptions_WithPartialOptions_ShouldMergeWithDefaults
+--- PASS: TestMergeInvokeOptions_WithPartialOptions_ShouldMergeWithDefaults (0.00s)
+=== RUN   TestCalculateBackoffDelay_WithZeroAttempt_ShouldReturnBaseDelay
+--- PASS: TestCalculateBackoffDelay_WithZeroAttempt_ShouldReturnBaseDelay (0.00s)
+=== RUN   TestCalculateBackoffDelay_WithIncrementingAttempts_ShouldIncreaseExponentially
+--- PASS: TestCalculateBackoffDelay_WithIncrementingAttempts_ShouldIncreaseExponentially (0.00s)
+=== RUN   TestCalculateBackoffDelay_WithOverflow_ShouldCapAtMaxDelay
+--- PASS: TestCalculateBackoffDelay_WithOverflow_ShouldCapAtMaxDelay (0.00s)
+=== RUN   TestInvokeE_WithValidInput_ShouldReturnResult
+2025/08/25 15:10:42 INFO Lambda operation started details="map[function_name:test-function invocation_type:RequestResponse log_type:None operation:invoke payload_size:19]"
+MockTest 2025-08-25T15:10:42-05:00 retry.go:91: Invoke Lambda function test-function
+2025/08/25 15:10:42 INFO Lambda operation completed details="map[duration_ms:0 function_name:test-function operation:invoke success:true]"
+--- PASS: TestInvokeE_WithValidInput_ShouldReturnResult (0.00s)
+=== RUN   TestInvokeE_WithInvalidFunctionName_ShouldReturnError
+--- PASS: TestInvokeE_WithInvalidFunctionName_ShouldReturnError (0.00s)
+=== RUN   TestInvokeE_WithInvalidPayload_ShouldReturnError
+--- PASS: TestInvokeE_WithInvalidPayload_ShouldReturnError (0.00s)
+=== RUN   TestInvokeE_WithClientError_ShouldReturnError
+2025/08/25 15:10:42 INFO Lambda operation started details="map[function_name:test-function invocation_type:RequestResponse log_type:None operation:invoke payload_size:19]"
+MockTest 2025-08-25T15:10:42-05:00 retry.go:91: Invoke Lambda function test-function
+MockTest 2025-08-25T15:10:42-05:00 retry.go:103: Invoke Lambda function test-function returned an error: lambda invoke API call failed: AWS API error. Sleeping for 1s and will try again.
+MockTest 2025-08-25T15:10:43-05:00 retry.go:91: Invoke Lambda function test-function
+MockTest 2025-08-25T15:10:43-05:00 retry.go:103: Invoke Lambda function test-function returned an error: lambda invoke API call failed: AWS API error. Sleeping for 1s and will try again.
+MockTest 2025-08-25T15:10:44-05:00 retry.go:91: Invoke Lambda function test-function
+MockTest 2025-08-25T15:10:44-05:00 retry.go:103: Invoke Lambda function test-function returned an error: lambda invoke API call failed: AWS API error. Sleeping for 1s and will try again.
+MockTest 2025-08-25T15:10:45-05:00 retry.go:91: Invoke Lambda function test-function
+MockTest 2025-08-25T15:10:45-05:00 retry.go:103: Invoke Lambda function test-function returned an error: lambda invoke API call failed: AWS API error. Sleeping for 1s and will try again.
+2025/08/25 15:10:46 ERROR Lambda operation failed details="map[duration_ms:4001 error:lambda invoke API call failed: AWS API error function_name:test-function operation:invoke success:false]"
+--- PASS: TestInvokeE_WithClientError_ShouldReturnError (4.00s)
+=== RUN   TestInvokeWithOptionsE_WithCustomOptions_ShouldUseOptions
+2025/08/25 15:10:46 INFO Lambda operation started details="map[function_name:test-function invocation_type:Event log_type:Tail operation:invoke payload_size:19]"
+MockTest 2025-08-25T15:10:46-05:00 retry.go:91: Invoke Lambda function test-function
+2025/08/25 15:10:46 INFO Lambda operation completed details="map[duration_ms:0 function_name:test-function operation:invoke success:true]"
+--- PASS: TestInvokeWithOptionsE_WithCustomOptions_ShouldUseOptions (0.00s)
+=== RUN   TestConstants_ShouldHaveExpectedValues
+    lambda_test.go:378: 
+        	Error Trace:	/home/family/sfx/lambda/lambda_test.go:378
+        	Error:      	Not equal: 
+        	            	expected: int32(128)
+        	            	actual  : int(128)
+        	Test:       	TestConstants_ShouldHaveExpectedValues
+--- FAIL: TestConstants_ShouldHaveExpectedValues (0.00s)
+=== RUN   TestErrorConstants_ShouldBeDefinedCorrectly
+--- PASS: TestErrorConstants_ShouldBeDefinedCorrectly (0.00s)
+=== RUN   TestContains_WithMatchingSubstring_ShouldReturnTrue
+=== RUN   TestContains_WithMatchingSubstring_ShouldReturnTrue/hello_world_contains_hello
+=== RUN   TestContains_WithMatchingSubstring_ShouldReturnTrue/hello_world_contains_world
+=== RUN   TestContains_WithMatchingSubstring_ShouldReturnTrue/hello_world_contains_llo_wo
+=== RUN   TestContains_WithMatchingSubstring_ShouldReturnTrue/ResourceNotFoundException_contains_ResourceNotFound
+--- PASS: TestContains_WithMatchingSubstring_ShouldReturnTrue (0.00s)
+    --- PASS: TestContains_WithMatchingSubstring_ShouldReturnTrue/hello_world_contains_hello (0.00s)
+    --- PASS: TestContains_WithMatchingSubstring_ShouldReturnTrue/hello_world_contains_world (0.00s)
+    --- PASS: TestContains_WithMatchingSubstring_ShouldReturnTrue/hello_world_contains_llo_wo (0.00s)
+    --- PASS: TestContains_WithMatchingSubstring_ShouldReturnTrue/ResourceNotFoundException_contains_ResourceNotFound (0.00s)
+=== RUN   TestContains_WithNonMatchingSubstring_ShouldReturnFalse
+=== RUN   TestContains_WithNonMatchingSubstring_ShouldReturnFalse/hello_world_does_not_contain_xyz
+=== RUN   TestContains_WithNonMatchingSubstring_ShouldReturnFalse/ResourceNotFoundException_does_not_contain_InvalidParameter
+=== RUN   TestContains_WithNonMatchingSubstring_ShouldReturnFalse/test_does_not_contain_testing
+--- PASS: TestContains_WithNonMatchingSubstring_ShouldReturnFalse (0.00s)
+    --- PASS: TestContains_WithNonMatchingSubstring_ShouldReturnFalse/hello_world_does_not_contain_xyz (0.00s)
+    --- PASS: TestContains_WithNonMatchingSubstring_ShouldReturnFalse/ResourceNotFoundException_does_not_contain_InvalidParameter (0.00s)
+    --- PASS: TestContains_WithNonMatchingSubstring_ShouldReturnFalse/test_does_not_contain_testing (0.00s)
+=== RUN   TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex
+=== RUN   TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex/hello_world_indexOf_hello
+=== RUN   TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex/hello_world_indexOf_world
+=== RUN   TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex/hello_world_indexOf_llo
+=== RUN   TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex/test_test_indexOf_test
+--- PASS: TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex (0.00s)
+    --- PASS: TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex/hello_world_indexOf_hello (0.00s)
+    --- PASS: TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex/hello_world_indexOf_world (0.00s)
+    --- PASS: TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex/hello_world_indexOf_llo (0.00s)
+    --- PASS: TestIndexOf_WithMatchingSubstring_ShouldReturnCorrectIndex/test_test_indexOf_test (0.00s)
+=== RUN   TestIndexOf_WithNonMatchingSubstring_ShouldReturnNegativeOne
+=== RUN   TestIndexOf_WithNonMatchingSubstring_ShouldReturnNegativeOne/hello_world_indexOf_xyz
+=== RUN   TestIndexOf_WithNonMatchingSubstring_ShouldReturnNegativeOne/test_indexOf_testing
+=== RUN   TestIndexOf_WithNonMatchingSubstring_ShouldReturnNegativeOne/_indexOf_test
+--- PASS: TestIndexOf_WithNonMatchingSubstring_ShouldReturnNegativeOne (0.00s)
+    --- PASS: TestIndexOf_WithNonMatchingSubstring_ShouldReturnNegativeOne/hello_world_indexOf_xyz (0.00s)
+    --- PASS: TestIndexOf_WithNonMatchingSubstring_ShouldReturnNegativeOne/test_indexOf_testing (0.00s)
+    --- PASS: TestIndexOf_WithNonMatchingSubstring_ShouldReturnNegativeOne/_indexOf_test (0.00s)
+=== RUN   TestSanitizeLogResult_ShouldRemoveInternalLogLines
+--- PASS: TestSanitizeLogResult_ShouldRemoveInternalLogLines (0.00s)
+=== RUN   TestBuildS3EventE_WithValidInput_ShouldReturnValidEvent
+--- PASS: TestBuildS3EventE_WithValidInput_ShouldReturnValidEvent (0.00s)
+=== RUN   TestBuildS3EventE_WithEmptyBucket_ShouldReturnError
+--- PASS: TestBuildS3EventE_WithEmptyBucket_ShouldReturnError (0.00s)
+=== RUN   TestBuildS3EventE_WithEmptyObjectKey_ShouldReturnError
+--- PASS: TestBuildS3EventE_WithEmptyObjectKey_ShouldReturnError (0.00s)
+=== RUN   TestBuildS3EventE_WithDefaultEventName_ShouldUseDefault
+--- PASS: TestBuildS3EventE_WithDefaultEventName_ShouldUseDefault (0.00s)
+=== RUN   TestParseS3EventE_WithValidEvent_ShouldParseCorrectly
+--- PASS: TestParseS3EventE_WithValidEvent_ShouldParseCorrectly (0.00s)
+=== RUN   TestParseS3EventE_WithInvalidJSON_ShouldReturnError
+--- PASS: TestParseS3EventE_WithInvalidJSON_ShouldReturnError (0.00s)
+=== RUN   TestExtractS3BucketNameE_WithValidEvent_ShouldExtractBucket
+--- PASS: TestExtractS3BucketNameE_WithValidEvent_ShouldExtractBucket (0.00s)
+=== RUN   TestExtractS3BucketNameE_WithNoRecords_ShouldReturnError
+--- PASS: TestExtractS3BucketNameE_WithNoRecords_ShouldReturnError (0.00s)
+=== RUN   TestExtractS3ObjectKeyE_WithValidEvent_ShouldExtractKey
+--- PASS: TestExtractS3ObjectKeyE_WithValidEvent_ShouldExtractKey (0.00s)
+=== RUN   TestExtractS3ObjectKeyE_WithNoRecords_ShouldReturnError
+--- PASS: TestExtractS3ObjectKeyE_WithNoRecords_ShouldReturnError (0.00s)
+FAIL
+FAIL	vasdeference/lambda	4.011s
+FAIL
