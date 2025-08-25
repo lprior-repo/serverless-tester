@@ -25,39 +25,51 @@ func NewTestFixturesWithNamespace(namespace string) *TestFixtures {
 	}
 }
 
+// getShortId returns a safe substring of timestamp for use in names
+func (f *TestFixtures) getShortId() string {
+	if len(f.timestamp) >= 10 {
+		return f.timestamp[:10]
+	}
+	return f.timestamp
+}
+
 // GetLambdaFunctionNames returns sample Lambda function names
 func (f *TestFixtures) GetLambdaFunctionNames() []string {
+	shortId := f.getShortId()
 	return []string{
-		fmt.Sprintf("%s-handler-function-%s", f.namespace, f.timestamp[:10]),
-		fmt.Sprintf("%s-processor-function-%s", f.namespace, f.timestamp[:10]),
-		fmt.Sprintf("%s-webhook-function-%s", f.namespace, f.timestamp[:10]),
+		fmt.Sprintf("%s-handler-function-%s", f.namespace, shortId),
+		fmt.Sprintf("%s-processor-function-%s", f.namespace, shortId),
+		fmt.Sprintf("%s-webhook-function-%s", f.namespace, shortId),
 	}
 }
 
 // GetDynamoDBTableNames returns sample DynamoDB table names
 func (f *TestFixtures) GetDynamoDBTableNames() []string {
+	shortId := f.getShortId()
 	return []string{
-		fmt.Sprintf("%s-users-table-%s", f.namespace, f.timestamp[:10]),
-		fmt.Sprintf("%s-orders-table-%s", f.namespace, f.timestamp[:10]),
-		fmt.Sprintf("%s-sessions-table-%s", f.namespace, f.timestamp[:10]),
+		fmt.Sprintf("%s-users-table-%s", f.namespace, shortId),
+		fmt.Sprintf("%s-orders-table-%s", f.namespace, shortId),
+		fmt.Sprintf("%s-sessions-table-%s", f.namespace, shortId),
 	}
 }
 
 // GetEventBridgeRuleNames returns sample EventBridge rule names
 func (f *TestFixtures) GetEventBridgeRuleNames() []string {
+	shortId := f.getShortId()
 	return []string{
-		fmt.Sprintf("%s-user-created-rule-%s", f.namespace, f.timestamp[:10]),
-		fmt.Sprintf("%s-order-processed-rule-%s", f.namespace, f.timestamp[:10]),
-		fmt.Sprintf("%s-payment-received-rule-%s", f.namespace, f.timestamp[:10]),
+		fmt.Sprintf("%s-user-created-rule-%s", f.namespace, shortId),
+		fmt.Sprintf("%s-order-processed-rule-%s", f.namespace, shortId),
+		fmt.Sprintf("%s-payment-received-rule-%s", f.namespace, shortId),
 	}
 }
 
 // GetStepFunctionNames returns sample Step Function names
 func (f *TestFixtures) GetStepFunctionNames() []string {
+	shortId := f.getShortId()
 	return []string{
-		fmt.Sprintf("%s-order-workflow-%s", f.namespace, f.timestamp[:10]),
-		fmt.Sprintf("%s-user-onboarding-%s", f.namespace, f.timestamp[:10]),
-		fmt.Sprintf("%s-data-pipeline-%s", f.namespace, f.timestamp[:10]),
+		fmt.Sprintf("%s-order-workflow-%s", f.namespace, shortId),
+		fmt.Sprintf("%s-user-onboarding-%s", f.namespace, shortId),
+		fmt.Sprintf("%s-data-pipeline-%s", f.namespace, shortId),
 	}
 }
 
@@ -188,18 +200,19 @@ func (f *TestFixtures) GetSampleAPIGatewayEvent() string {
 
 // GetSampleTerraformOutputs returns sample Terraform outputs structure
 func (f *TestFixtures) GetSampleTerraformOutputs() map[string]interface{} {
+	shortId := f.getShortId()
 	return map[string]interface{}{
 		"lambda_function_arn": fmt.Sprintf("arn:aws:lambda:us-east-1:123456789012:function:%s-handler-%s",
-			f.namespace, f.timestamp[:10]),
-		"lambda_function_name": fmt.Sprintf("%s-handler-%s", f.namespace, f.timestamp[:10]),
+			f.namespace, shortId),
+		"lambda_function_name": fmt.Sprintf("%s-handler-%s", f.namespace, shortId),
 		"api_gateway_url": fmt.Sprintf("https://%s-api.execute-api.us-east-1.amazonaws.com/prod",
-			f.timestamp[:10]),
-		"dynamodb_table_name": fmt.Sprintf("%s-users-%s", f.namespace, f.timestamp[:10]),
+			shortId),
+		"dynamodb_table_name": fmt.Sprintf("%s-users-%s", f.namespace, shortId),
 		"dynamodb_table_arn": fmt.Sprintf("arn:aws:dynamodb:us-east-1:123456789012:table/%s-users-%s",
-			f.namespace, f.timestamp[:10]),
-		"eventbridge_rule_name": fmt.Sprintf("%s-user-events-%s", f.namespace, f.timestamp[:10]),
+			f.namespace, shortId),
+		"eventbridge_rule_name": fmt.Sprintf("%s-user-events-%s", f.namespace, shortId),
 		"step_function_arn": fmt.Sprintf("arn:aws:states:us-east-1:123456789012:stateMachine:%s-workflow-%s",
-			f.namespace, f.timestamp[:10]),
+			f.namespace, shortId),
 	}
 }
 
@@ -226,7 +239,7 @@ func (f *TestFixtures) GetSampleLambdaContext() map[string]interface{} {
 		"memoryLimitInMB": "128",
 		"remainingTimeInMillis": 30000,
 		"logGroupName":  fmt.Sprintf("/aws/lambda/%s-handler", f.namespace),
-		"logStreamName": fmt.Sprintf("2023/01/01/[$LATEST]%s", f.timestamp[:10]),
+		"logStreamName": fmt.Sprintf("2023/01/01/[$LATEST]%s", f.getShortId()),
 		"awsRequestId":  "c6af9ac6-7b61-11e6-9a41-93e8deadbeef",
 	}
 }

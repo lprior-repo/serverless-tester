@@ -220,7 +220,7 @@ func BuildSQSEvent(queueUrl string, messageID string, messageBody string) Custom
 	
 	return CustomEvent{
 		Source:       "aws.sqs",
-		DetailType:   "SQS Message",
+		DetailType:   "SQS Message Available",
 		Detail:       string(detailJSON),
 		EventBusName: DefaultEventBusName,
 		Resources:    []string{detail.QueueArn},
@@ -293,7 +293,9 @@ func BuildECSEvent(clusterArn string, taskArn string, lastStatus string, desired
 // BuildCloudWatchEvent creates a CloudWatch EventBridge event
 func BuildCloudWatchEvent(alarmName string, newState string, reason string, metricName string) CustomEvent {
 	detail := map[string]interface{}{
-		"alarmName":                alarmName,
+		"alarmName": alarmName,
+		"newState":  newState,
+		"reason":    reason,
 		"state": map[string]interface{}{
 			"value":     newState,
 			"reason":    reason,
@@ -336,7 +338,7 @@ func BuildAPIGatewayEvent(apiID string, stage string, requestID string, status s
 	
 	return CustomEvent{
 		Source:       "aws.apigateway",
-		DetailType:   "API Gateway Execution State Change",
+		DetailType:   "API Gateway Execution",
 		Detail:       string(detailJSON),
 		EventBusName: DefaultEventBusName,
 		Resources:    []string{fmt.Sprintf("arn:aws:apigateway:us-east-1:123456789012:restapi/%s", apiID)},
