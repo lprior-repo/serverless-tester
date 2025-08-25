@@ -18,8 +18,39 @@ func (m *mockTestingT) Errorf(format string, args ...interface{}) {
 	m.errorMessages = append(m.errorMessages, format)
 }
 
+func (m *mockTestingT) Error(args ...interface{}) {
+	m.failed = true
+	for _, arg := range args {
+		if str, ok := arg.(string); ok {
+			m.errorMessages = append(m.errorMessages, str)
+		}
+	}
+}
+
+func (m *mockTestingT) Fail() {
+	m.failed = true
+}
+
 func (m *mockTestingT) FailNow() {
 	m.failed = true
+}
+
+func (m *mockTestingT) Helper() {
+	// No-op for mock
+}
+
+func (m *mockTestingT) Fatal(args ...interface{}) {
+	m.failed = true
+	panic("test fatal")
+}
+
+func (m *mockTestingT) Fatalf(format string, args ...interface{}) {
+	m.failed = true
+	panic("test fatal")
+}
+
+func (m *mockTestingT) Name() string {
+	return "mockTestingT"
 }
 
 func newMockTestingT() *mockTestingT {
@@ -638,5 +669,275 @@ func BenchmarkFindHistoryEventsByType(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = findHistoryEventsByType(events, types.HistoryEventTypeTaskStateEntered)
+	}
+}
+
+// Tests for uncovered Input methods
+
+func TestInputGet(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFunc   func() *Input
+		key         string
+		expectedVal interface{}
+		shouldExist bool
+		description string
+	}{
+		{
+			name: "GetExistingStringValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("message", "Hello, World!")
+			},
+			key:         "message",
+			expectedVal: "Hello, World!",
+			shouldExist: true,
+			description: "Should get existing string value",
+		},
+		{
+			name: "GetExistingIntValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("count", 42)
+			},
+			key:         "count",
+			expectedVal: 42,
+			shouldExist: true,
+			description: "Should get existing int value",
+		},
+		{
+			name: "GetExistingBoolValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("enabled", true)
+			},
+			key:         "enabled",
+			expectedVal: true,
+			shouldExist: true,
+			description: "Should get existing bool value",
+		},
+		{
+			name: "GetNonExistingValue",
+			setupFunc: func() *Input {
+				return NewInput()
+			},
+			key:         "missing",
+			expectedVal: nil,
+			shouldExist: false,
+			description: "Should return nil for non-existing value",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			input := tc.setupFunc()
+
+			// Act
+			value, exists := input.Get(tc.key)
+
+			// Assert
+			assert.Equal(t, tc.shouldExist, exists, tc.description)
+			if tc.shouldExist {
+				assert.Equal(t, tc.expectedVal, value, tc.description)
+			} else {
+				assert.Nil(t, value, tc.description)
+			}
+		})
+	}
+}
+
+func TestInputGetString(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFunc   func() *Input
+		key         string
+		expected    string
+		shouldExist bool
+		description string
+	}{
+		{
+			name: "GetExistingStringValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("message", "Hello, World!")
+			},
+			key:         "message",
+			expected:    "Hello, World!",
+			shouldExist: true,
+			description: "Should get existing string value",
+		},
+		{
+			name: "GetNonExistingValue",
+			setupFunc: func() *Input {
+				return NewInput()
+			},
+			key:         "missing",
+			expected:    "",
+			shouldExist: false,
+			description: "Should return empty string for non-existing value",
+		},
+		{
+			name: "GetNonStringValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("count", 42)
+			},
+			key:         "count",
+			expected:    "",
+			shouldExist: false,
+			description: "Should return empty string for non-string value",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			input := tc.setupFunc()
+
+			// Act
+			value, exists := input.GetString(tc.key)
+
+			// Assert
+			assert.Equal(t, tc.expected, value, tc.description)
+			assert.Equal(t, tc.shouldExist, exists, tc.description)
+		})
+	}
+}
+
+func TestInputGetInt(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFunc   func() *Input
+		key         string
+		expected    int
+		shouldExist bool
+		description string
+	}{
+		{
+			name: "GetExistingIntValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("count", 42)
+			},
+			key:         "count",
+			expected:    42,
+			shouldExist: true,
+			description: "Should get existing int value",
+		},
+		{
+			name: "GetNonExistingValue",
+			setupFunc: func() *Input {
+				return NewInput()
+			},
+			key:         "missing",
+			expected:    0,
+			shouldExist: false,
+			description: "Should return zero for non-existing value",
+		},
+		{
+			name: "GetNonIntValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("message", "Hello")
+			},
+			key:         "message",
+			expected:    0,
+			shouldExist: false,
+			description: "Should return zero for non-int value",
+		},
+		{
+			name: "GetFloatValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("value", 42.5)
+			},
+			key:         "value",
+			expected:    0,
+			shouldExist: false,
+			description: "Should return zero for float value",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			input := tc.setupFunc()
+
+			// Act
+			value, exists := input.GetInt(tc.key)
+
+			// Assert
+			assert.Equal(t, tc.expected, value, tc.description)
+			assert.Equal(t, tc.shouldExist, exists, tc.description)
+		})
+	}
+}
+
+func TestInputGetBool(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFunc   func() *Input
+		key         string
+		expected    bool
+		shouldExist bool
+		description string
+	}{
+		{
+			name: "GetExistingBoolValueTrue",
+			setupFunc: func() *Input {
+				return NewInput().Set("enabled", true)
+			},
+			key:         "enabled",
+			expected:    true,
+			shouldExist: true,
+			description: "Should get existing bool value true",
+		},
+		{
+			name: "GetExistingBoolValueFalse",
+			setupFunc: func() *Input {
+				return NewInput().Set("disabled", false)
+			},
+			key:         "disabled",
+			expected:    false,
+			shouldExist: true,
+			description: "Should get existing bool value false",
+		},
+		{
+			name: "GetNonExistingValue",
+			setupFunc: func() *Input {
+				return NewInput()
+			},
+			key:         "missing",
+			expected:    false,
+			shouldExist: false,
+			description: "Should return false for non-existing value",
+		},
+		{
+			name: "GetNonBoolValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("message", "Hello")
+			},
+			key:         "message",
+			expected:    false,
+			shouldExist: false,
+			description: "Should return false for non-bool value",
+		},
+		{
+			name: "GetIntValue",
+			setupFunc: func() *Input {
+				return NewInput().Set("count", 42)
+			},
+			key:         "count",
+			expected:    false,
+			shouldExist: false,
+			description: "Should return false for int value",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			input := tc.setupFunc()
+
+			// Act
+			value, exists := input.GetBool(tc.key)
+
+			// Assert
+			assert.Equal(t, tc.expected, value, tc.description)
+			assert.Equal(t, tc.shouldExist, exists, tc.description)
+		})
 	}
 }

@@ -311,7 +311,8 @@ func AssertEventBatchSentE(ctx *TestContext, result PutEventsResult) error {
 				failedEntries = append(failedEntries, fmt.Sprintf("Entry %d: %s - %s", i, entry.ErrorCode, entry.ErrorMessage))
 			}
 		}
-		return fmt.Errorf("%d events failed to send:\n%s", result.FailedEntryCount, strings.Join(failedEntries, "\n"))
+		totalEntries := len(result.Entries)
+		return fmt.Errorf("%d out of %d events failed to send:\n%s", result.FailedEntryCount, totalEntries, strings.Join(failedEntries, "\n"))
 	}
 	
 	for i, entry := range result.Entries {
@@ -334,14 +335,20 @@ func AssertRuleHasPattern(ctx *TestContext, ruleName string, eventBusName string
 
 // AssertRuleHasPatternE asserts that a rule has the expected event pattern and returns error
 func AssertRuleHasPatternE(ctx *TestContext, ruleName string, eventBusName string, expectedPattern string) error {
-	_, err := DescribeRuleE(ctx, ruleName, eventBusName)
+	rule, err := DescribeRuleE(ctx, ruleName, eventBusName)
 	if err != nil {
 		return fmt.Errorf("failed to describe rule '%s': %w", ruleName, err)
 	}
 	
-	// This is a simplified check - in reality, you'd need to compare the actual pattern
-	// stored in the rule with the expected pattern. AWS doesn't expose this directly
-	// through DescribeRule, so this would need additional implementation.
+	// Check if rule has no event pattern (e.g., scheduled rule)
+	if rule.EventPattern == "" {
+		return fmt.Errorf("rule has no event pattern: '%s' (it may be a scheduled rule)", ruleName)
+	}
+	
+	// Compare actual pattern with expected pattern
+	if rule.EventPattern != expectedPattern {
+		return fmt.Errorf("rule has different pattern. Rule '%s' - Actual: %s, Expected: %s", ruleName, rule.EventPattern, expectedPattern)
+	}
 	
 	return nil
 }

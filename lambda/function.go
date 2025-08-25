@@ -594,3 +594,172 @@ func DeleteFunctionE(ctx *TestContext, functionName string) error {
 	
 	return nil
 }
+
+// UpdateFunctionCode updates the code of a Lambda function.
+// This is the non-error returning version that follows Terratest patterns.
+func UpdateFunctionCode(ctx *TestContext, input *lambda.UpdateFunctionCodeInput) *UpdateFunctionCodeResult {
+	result, err := UpdateFunctionCodeE(ctx, input)
+	if err != nil {
+		ctx.T.Errorf("Failed to update Lambda function code: %v", err)
+		ctx.T.FailNow()
+	}
+	return result
+}
+
+// UpdateFunctionCodeE updates the code of a Lambda function.
+// This is the error returning version that follows Terratest patterns.
+func UpdateFunctionCodeE(ctx *TestContext, input *lambda.UpdateFunctionCodeInput) (*UpdateFunctionCodeResult, error) {
+	startTime := time.Now()
+	
+	functionName := ""
+	if input.FunctionName != nil {
+		functionName = *input.FunctionName
+	}
+	
+	// Validate function name
+	if err := validateFunctionName(functionName); err != nil {
+		return nil, err
+	}
+	
+	logOperation("update_function_code", functionName, map[string]interface{}{
+		"has_zip_file":   input.ZipFile != nil,
+		"has_s3_bucket":  input.S3Bucket != nil,
+		"has_image_uri":  input.ImageUri != nil,
+		"publish":        input.Publish,
+	})
+	
+	client := createLambdaClient(ctx)
+	
+	output, err := client.UpdateFunctionCode(context.Background(), input)
+	if err != nil {
+		duration := time.Since(startTime)
+		logResult("update_function_code", functionName, false, duration, err)
+		return nil, fmt.Errorf("failed to update function code: %w", err)
+	}
+	
+	result := convertToUpdateFunctionCodeResult(output)
+	
+	duration := time.Since(startTime)
+	logResult("update_function_code", functionName, true, duration, nil)
+	
+	return result, nil
+}
+
+// convertToUpdateFunctionCodeResult converts AWS UpdateFunctionCodeOutput to our type
+func convertToUpdateFunctionCodeResult(output *lambda.UpdateFunctionCodeOutput) *UpdateFunctionCodeResult {
+	result := &UpdateFunctionCodeResult{}
+	
+	if output.FunctionName != nil {
+		result.FunctionName = *output.FunctionName
+	}
+	
+	if output.FunctionArn != nil {
+		result.FunctionArn = *output.FunctionArn
+	}
+	
+	result.Runtime = output.Runtime
+	
+	if output.Handler != nil {
+		result.Handler = *output.Handler
+	}
+	
+	if output.Description != nil {
+		result.Description = *output.Description
+	}
+	
+	if output.Timeout != nil {
+		result.Timeout = *output.Timeout
+	}
+	
+	if output.MemorySize != nil {
+		result.MemorySize = *output.MemorySize
+	}
+	
+	if output.LastModified != nil {
+		result.LastModified = *output.LastModified
+	}
+	
+	if output.CodeSha256 != nil {
+		result.CodeSha256 = *output.CodeSha256
+	}
+	
+	if output.Version != nil {
+		result.Version = *output.Version
+	}
+	
+	result.PackageType = output.PackageType
+	
+	return result
+}
+
+// PublishLayerVersionE creates a new Lambda layer version.
+// This is the error returning version that follows Terratest patterns.
+func PublishLayerVersionE(ctx *TestContext, input *lambda.PublishLayerVersionInput) (*LayerVersionInfo, error) {
+	startTime := time.Now()
+	
+	layerName := ""
+	if input.LayerName != nil {
+		layerName = *input.LayerName
+	}
+	
+	// Validate layer name
+	if err := validateLayerName(layerName); err != nil {
+		return nil, err
+	}
+	
+	logOperation("publish_layer_version", layerName, map[string]interface{}{
+		"description": aws.ToString(input.Description),
+	})
+	
+	client := createLambdaClient(ctx)
+	
+	output, err := client.PublishLayerVersion(context.Background(), input)
+	if err != nil {
+		duration := time.Since(startTime)
+		logResult("publish_layer_version", layerName, false, duration, err)
+		return nil, fmt.Errorf("failed to publish layer version: %w", err)
+	}
+	
+	result := &LayerVersionInfo{
+		LayerName:          layerName,
+		LayerArn:           aws.ToString(output.LayerArn),
+		LayerVersionArn:    aws.ToString(output.LayerVersionArn),
+		Version:            output.Version,
+		Description:        aws.ToString(output.Description),
+		CreatedDate:        aws.ToString(output.CreatedDate),
+		CompatibleRuntimes: output.CompatibleRuntimes,
+	}
+	
+	if output.Content != nil {
+		result.CodeSha256 = aws.ToString(output.Content.CodeSha256)
+		result.CodeSize = output.Content.CodeSize
+	}
+	
+	duration := time.Since(startTime)
+	logResult("publish_layer_version", layerName, true, duration, nil)
+	
+	return result, nil
+}
+
+// validateLayerName validates that the layer name follows AWS naming conventions
+func validateLayerName(layerName string) error {
+	if layerName == "" {
+		return fmt.Errorf("invalid layer name: empty name")
+	}
+	
+	if len(layerName) > 64 {
+		return fmt.Errorf("invalid layer name: name too long (%d characters)", len(layerName))
+	}
+	
+	// Layer names must match pattern: [a-zA-Z0-9-_]+
+	for _, char := range layerName {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '-' || char == '_') {
+			return fmt.Errorf("invalid layer name: invalid character '%c'", char)
+		}
+	}
+	
+	return nil
+}

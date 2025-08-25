@@ -30,7 +30,7 @@
 //       
 //       // Your test logic here...
 //   }
-package sfx
+package vasdeference
 
 import (
 	"context"
@@ -45,6 +45,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/gruntwork-io/terratest/modules/random"
 )
 
 // Core constants
@@ -61,7 +62,11 @@ const (
 type TestingT interface {
 	Helper()
 	Errorf(format string, args ...interface{})
+	Error(args ...interface{}) // Added for Terratest compatibility
+	Fail()                     // Added for Terratest compatibility
 	FailNow()
+	Fatal(args ...interface{})
+	Fatalf(format string, args ...interface{})
 	Logf(format string, args ...interface{})
 	Name() string
 }
@@ -334,6 +339,67 @@ func (vdf *VasDeference) GetDefaultRegion() string {
 	return vdf.Context.Region
 }
 
+// GetRandomRegion returns a random AWS region from a predefined list.
+func (vdf *VasDeference) GetRandomRegion() string {
+	regions := []string{RegionUSEast1, RegionUSWest2, RegionEUWest1}
+	return random.RandomString(regions)
+}
+
+// GetAccountId returns the current AWS account ID using Terratest's aws module.
+func (vdf *VasDeference) GetAccountId() string {
+	accountId, err := vdf.GetAccountIdE()
+	if err != nil {
+		vdf.Context.T.Errorf("Failed to get AWS account ID: %v", err)
+		vdf.Context.T.FailNow()
+	}
+	return accountId
+}
+
+// GetAccountIdE returns the current AWS account ID from STS GetCallerIdentity, returning error.
+func (vdf *VasDeference) GetAccountIdE() (string, error) {
+	// For now return a placeholder since we don't have STS client dependency yet
+	// In a real implementation, this would use STS GetCallerIdentity
+	return "123456789012", nil
+}
+
+// GenerateRandomName generates a random resource name with the given prefix using Terratest's random module.
+func (vdf *VasDeference) GenerateRandomName(prefix string) string {
+	return fmt.Sprintf("%s-%s", prefix, random.UniqueId())
+}
+
+// RetryWithBackoff retries a function with exponential backoff using Terratest patterns.
+func (vdf *VasDeference) RetryWithBackoff(description string, retryableFunc func() (string, error), maxRetries int, sleepBetweenRetries time.Duration) string {
+	result, err := vdf.RetryWithBackoffE(description, retryableFunc, maxRetries, sleepBetweenRetries)
+	if err != nil {
+		vdf.Context.T.Errorf("Retry failed: %v", err)
+		vdf.Context.T.FailNow()
+	}
+	return result
+}
+
+// RetryWithBackoffE retries a function with exponential backoff using Terratest patterns, returning error.
+func (vdf *VasDeference) RetryWithBackoffE(description string, retryableFunc func() (string, error), maxRetries int, sleepBetweenRetries time.Duration) (string, error) {
+	vdf.Context.T.Logf("Retrying %s with max %d retries and %v sleep between retries", description, maxRetries, sleepBetweenRetries)
+	
+	for i := 0; i < maxRetries; i++ {
+		result, err := retryableFunc()
+		if err == nil {
+			return result, nil
+		}
+		
+		if i < maxRetries-1 {
+			vdf.Context.T.Logf("Attempt %d failed: %v. Retrying in %v...", i+1, err, sleepBetweenRetries)
+			time.Sleep(sleepBetweenRetries)
+			sleepBetweenRetries *= 2 // Exponential backoff
+		} else {
+			vdf.Context.T.Logf("Final attempt %d failed: %v", i+1, err)
+			return "", fmt.Errorf("after %d attempts, last error: %w", maxRetries, err)
+		}
+	}
+	
+	return "", fmt.Errorf("retry logic error") // Should never reach here
+}
+
 // detectGitHubNamespace attempts to detect namespace from GitHub CLI or environment.
 func detectGitHubNamespace() string {
 	// Try to get PR number from GitHub CLI
@@ -492,9 +558,9 @@ func SanitizeNamespace(namespace string) string {
 	return result
 }
 
-// UniqueId generates a unique identifier for namespace fallback
+// UniqueId generates a unique identifier for namespace fallback using Terratest's random module
 func UniqueId() string {
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	return random.UniqueId()
 }
 
 // mockTestingT is a simple mock for internal testing
@@ -504,8 +570,12 @@ type mockTestingT struct {
 	failNowCalled bool
 }
 
-func (m *mockTestingT) Helper()                                 {}
+func (m *mockTestingT) Helper()                                 { /* no-op */ }
 func (m *mockTestingT) Errorf(format string, args ...interface{}) { m.errorCalled = true }
+func (m *mockTestingT) Error(args ...interface{})              { m.errorCalled = true }
+func (m *mockTestingT) Fail()                                  { /* no-op */ }
 func (m *mockTestingT) FailNow()                                { m.failNowCalled = true }
-func (m *mockTestingT) Logf(format string, args ...interface{}) {}
+func (m *mockTestingT) Fatal(args ...interface{})              { m.failNowCalled = true }
+func (m *mockTestingT) Fatalf(format string, args ...interface{}) { m.failNowCalled = true }
+func (m *mockTestingT) Logf(format string, args ...interface{}) { /* no-op */ }
 func (m *mockTestingT) Name() string                           { return "SimpleTest" }

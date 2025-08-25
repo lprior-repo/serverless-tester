@@ -28,16 +28,19 @@ func CreateStateMachine(ctx *TestContext, definition *StateMachineDefinition, op
 // CreateStateMachineE creates a new Step Functions state machine with error return
 func CreateStateMachineE(ctx *TestContext, definition *StateMachineDefinition, options *StateMachineOptions) (*StateMachineInfo, error) {
 	start := time.Now()
+	
+	// Validate input parameters first
+	if err := validateStateMachineCreation(definition, options); err != nil {
+		logResult("CreateStateMachine", false, time.Since(start), err)
+		return nil, err
+	}
+	
 	logOperation("CreateStateMachine", map[string]interface{}{
 		"name": definition.Name,
 		"type": definition.Type,
 	})
 	
-	// Validate input parameters
-	if err := validateStateMachineCreation(definition, options); err != nil {
-		logResult("CreateStateMachine", false, time.Since(start), err)
-		return nil, err
-	}
+	// Continue with AWS client operations
 	
 	client := createStepFunctionsClient(ctx)
 	
@@ -269,8 +272,8 @@ func ListStateMachinesE(ctx *TestContext, maxResults int32) ([]*StateMachineInfo
 		return nil, fmt.Errorf("failed to list state machines: %w", err)
 	}
 	
-	// Convert results to our standard format
-	var infos []*StateMachineInfo
+	// Convert results to our standard format - initialize empty slice instead of nil
+	infos := make([]*StateMachineInfo, 0, len(result.StateMachines))
 	for _, sm := range result.StateMachines {
 		info := &StateMachineInfo{
 			StateMachineArn: aws.ToString(sm.StateMachineArn),
@@ -283,6 +286,153 @@ func ListStateMachinesE(ctx *TestContext, maxResults int32) ([]*StateMachineInfo
 	
 	logResult("ListStateMachines", true, time.Since(start), nil)
 	return infos, nil
+}
+
+// Tag Management for State Machines
+
+// TagStateMachine adds tags to a state machine
+func TagStateMachine(ctx *TestContext, stateMachineArn string, tags map[string]string) {
+	err := TagStateMachineE(ctx, stateMachineArn, tags)
+	if err != nil {
+		ctx.T.FailNow()
+	}
+}
+
+// TagStateMachineE adds tags to a state machine with error return
+func TagStateMachineE(ctx *TestContext, stateMachineArn string, tags map[string]string) error {
+	start := time.Now()
+	logOperation("TagStateMachine", map[string]interface{}{
+		"state_machine": stateMachineArn,
+		"tag_count":     len(tags),
+	})
+
+	// Validate input parameters
+	if err := validateStateMachineArn(stateMachineArn); err != nil {
+		logResult("TagStateMachine", false, time.Since(start), err)
+		return err
+	}
+
+	if len(tags) == 0 {
+		err := fmt.Errorf("at least one tag is required")
+		logResult("TagStateMachine", false, time.Since(start), err)
+		return err
+	}
+
+	client := createStepFunctionsClient(ctx)
+
+	// Convert tags to AWS SDK format
+	var awsTags []types.Tag
+	for key, value := range tags {
+		awsTags = append(awsTags, types.Tag{
+			Key:   aws.String(key),
+			Value: aws.String(value),
+		})
+	}
+
+	input := &sfn.TagResourceInput{
+		ResourceArn: aws.String(stateMachineArn),
+		Tags:        awsTags,
+	}
+
+	_, err := client.TagResource(context.TODO(), input)
+	if err != nil {
+		logResult("TagStateMachine", false, time.Since(start), err)
+		return fmt.Errorf("failed to tag state machine: %w", err)
+	}
+
+	logResult("TagStateMachine", true, time.Since(start), nil)
+	return nil
+}
+
+// UntagStateMachine removes tags from a state machine
+func UntagStateMachine(ctx *TestContext, stateMachineArn string, tagKeys []string) {
+	err := UntagStateMachineE(ctx, stateMachineArn, tagKeys)
+	if err != nil {
+		ctx.T.FailNow()
+	}
+}
+
+// UntagStateMachineE removes tags from a state machine with error return
+func UntagStateMachineE(ctx *TestContext, stateMachineArn string, tagKeys []string) error {
+	start := time.Now()
+	logOperation("UntagStateMachine", map[string]interface{}{
+		"state_machine": stateMachineArn,
+		"key_count":     len(tagKeys),
+	})
+
+	// Validate input parameters
+	if err := validateStateMachineArn(stateMachineArn); err != nil {
+		logResult("UntagStateMachine", false, time.Since(start), err)
+		return err
+	}
+
+	if len(tagKeys) == 0 {
+		err := fmt.Errorf("at least one tag key is required")
+		logResult("UntagStateMachine", false, time.Since(start), err)
+		return err
+	}
+
+	client := createStepFunctionsClient(ctx)
+
+	input := &sfn.UntagResourceInput{
+		ResourceArn: aws.String(stateMachineArn),
+		TagKeys:     tagKeys,
+	}
+
+	_, err := client.UntagResource(context.TODO(), input)
+	if err != nil {
+		logResult("UntagStateMachine", false, time.Since(start), err)
+		return fmt.Errorf("failed to untag state machine: %w", err)
+	}
+
+	logResult("UntagStateMachine", true, time.Since(start), nil)
+	return nil
+}
+
+// ListStateMachineTags lists all tags for a state machine
+func ListStateMachineTags(ctx *TestContext, stateMachineArn string) map[string]string {
+	tags, err := ListStateMachineTagsE(ctx, stateMachineArn)
+	if err != nil {
+		ctx.T.FailNow()
+	}
+	return tags
+}
+
+// ListStateMachineTagsE lists all tags for a state machine with error return
+func ListStateMachineTagsE(ctx *TestContext, stateMachineArn string) (map[string]string, error) {
+	start := time.Now()
+	logOperation("ListStateMachineTags", map[string]interface{}{
+		"state_machine": stateMachineArn,
+	})
+
+	// Validate input parameters
+	if err := validateStateMachineArn(stateMachineArn); err != nil {
+		logResult("ListStateMachineTags", false, time.Since(start), err)
+		return nil, err
+	}
+
+	client := createStepFunctionsClient(ctx)
+
+	input := &sfn.ListTagsForResourceInput{
+		ResourceArn: aws.String(stateMachineArn),
+	}
+
+	result, err := client.ListTagsForResource(context.TODO(), input)
+	if err != nil {
+		logResult("ListStateMachineTags", false, time.Since(start), err)
+		return nil, fmt.Errorf("failed to list state machine tags: %w", err)
+	}
+
+	// Convert AWS tags to map
+	tags := make(map[string]string)
+	for _, tag := range result.Tags {
+		if tag.Key != nil && tag.Value != nil {
+			tags[*tag.Key] = *tag.Value
+		}
+	}
+
+	logResult("ListStateMachineTags", true, time.Since(start), nil)
+	return tags, nil
 }
 
 // Execution Management
@@ -358,7 +508,7 @@ func StartExecutionE(ctx *TestContext, stateMachineArn, executionName string, in
 	}
 	
 	logResult("StartExecution", true, time.Since(start), nil)
-	return processExecutionResult(execResult), nil
+	return execResult, nil
 }
 
 // StopExecution stops a running Step Functions execution

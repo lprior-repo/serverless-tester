@@ -2,7 +2,8 @@ package testutils
 
 import (
 	"fmt"
-	"time"
+
+	"github.com/gruntwork-io/terratest/modules/random"
 )
 
 // TestFixtures provides common test data and fixtures for testing
@@ -20,7 +21,7 @@ func NewTestFixtures() *TestFixtures {
 func NewTestFixturesWithNamespace(namespace string) *TestFixtures {
 	return &TestFixtures{
 		namespace: namespace,
-		timestamp: fmt.Sprintf("%d", time.Now().UnixNano()),
+		timestamp: random.UniqueId(),
 	}
 }
 

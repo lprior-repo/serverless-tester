@@ -18,7 +18,7 @@ func createTestExecutionPattern() *ExecutionPattern {
 	return &ExecutionPattern{
 		Status:           &status,
 		OutputContains:   "success",
-		OutputJSON:       map[string]interface{}{"result": "success"},
+		OutputJSON:       map[string]interface{}{"result": "success", "message": "Hello, World!"},
 		ErrorContains:    "",
 		MinExecutionTime: &minTime,
 		MaxExecutionTime: &maxTime,
@@ -467,6 +467,425 @@ func TestAssertExecutionPatternE(t *testing.T) {
 			
 			// Assert
 			assert.Equal(t, tc.expected, actualResult, tc.description)
+		})
+	}
+}
+
+// Tests for non-E variants (panic on error assertion functions)
+
+func TestAssertExecutionSucceeded(t *testing.T) {
+	tests := []struct {
+		name        string
+		result      *ExecutionResult
+		shouldPanic bool
+		description string
+	}{
+		{
+			name:        "SuccessfulExecutionShouldNotPanic",
+			result:      createSuccessfulExecutionResult(),
+			shouldPanic: false,
+			description: "Successful execution should not cause panic",
+		},
+		{
+			name:        "FailedExecutionShouldPanic",
+			result:      createFailedExecutionResult(),
+			shouldPanic: true,
+			description: "Failed execution should cause panic",
+		},
+		{
+			name:        "NilResultShouldPanic",
+			result:      nil,
+			shouldPanic: true,
+			description: "Nil result should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionSucceeded to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionSucceeded(mockT, tc.result)
+			} else {
+				// For successful cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionSucceeded(mockT, tc.result)
+			}
+		})
+	}
+}
+
+func TestAssertExecutionFailed(t *testing.T) {
+	tests := []struct {
+		name        string
+		result      *ExecutionResult
+		shouldPanic bool
+		description string
+	}{
+		{
+			name:        "FailedExecutionShouldNotPanic",
+			result:      createFailedExecutionResult(),
+			shouldPanic: false,
+			description: "Failed execution should not cause panic",
+		},
+		{
+			name:        "SuccessfulExecutionShouldPanic",
+			result:      createSuccessfulExecutionResult(),
+			shouldPanic: true,
+			description: "Successful execution should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionFailed to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionFailed(mockT, tc.result)
+			} else {
+				// For expected failure cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionFailed(mockT, tc.result)
+			}
+		})
+	}
+}
+
+func TestAssertExecutionTimedOut(t *testing.T) {
+	timedOutResult := &ExecutionResult{
+		ExecutionArn:    "arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test-execution",
+		StateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+		Name:            "test-execution",
+		Status:          types.ExecutionStatusTimedOut,
+		StartDate:       time.Now().Add(-10 * time.Minute),
+		StopDate:        time.Now(),
+		Input:           `{"message": "Hello, World!"}`,
+		ExecutionTime:   10 * time.Minute,
+	}
+
+	tests := []struct {
+		name        string
+		result      *ExecutionResult
+		shouldPanic bool
+		description string
+	}{
+		{
+			name:        "TimedOutExecutionShouldNotPanic",
+			result:      timedOutResult,
+			shouldPanic: false,
+			description: "Timed out execution should not cause panic",
+		},
+		{
+			name:        "SuccessfulExecutionShouldPanic",
+			result:      createSuccessfulExecutionResult(),
+			shouldPanic: true,
+			description: "Successful execution should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionTimedOut to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionTimedOut(mockT, tc.result)
+			} else {
+				// For expected timeout cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionTimedOut(mockT, tc.result)
+			}
+		})
+	}
+}
+
+func TestAssertExecutionAborted(t *testing.T) {
+	abortedResult := &ExecutionResult{
+		ExecutionArn:    "arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test-execution",
+		StateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+		Name:            "test-execution",
+		Status:          types.ExecutionStatusAborted,
+		StartDate:       time.Now().Add(-2 * time.Minute),
+		StopDate:        time.Now(),
+		Input:           `{"message": "Hello, World!"}`,
+		ExecutionTime:   1 * time.Minute,
+	}
+
+	tests := []struct {
+		name        string
+		result      *ExecutionResult
+		shouldPanic bool
+		description string
+	}{
+		{
+			name:        "AbortedExecutionShouldNotPanic",
+			result:      abortedResult,
+			shouldPanic: false,
+			description: "Aborted execution should not cause panic",
+		},
+		{
+			name:        "SuccessfulExecutionShouldPanic",
+			result:      createSuccessfulExecutionResult(),
+			shouldPanic: true,
+			description: "Successful execution should cause panic when expecting aborted",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionAborted to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionAborted(mockT, tc.result)
+			} else {
+				// For expected aborted cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionAborted(mockT, tc.result)
+			}
+		})
+	}
+}
+
+func TestAssertExecutionOutput(t *testing.T) {
+	tests := []struct {
+		name           string
+		result         *ExecutionResult
+		expectedOutput string
+		shouldPanic    bool
+		description    string
+	}{
+		{
+			name:           "MatchingOutputShouldNotPanic",
+			result:         createSuccessfulExecutionResult(),
+			expectedOutput: "success",
+			shouldPanic:    false,
+			description:    "Matching output should not cause panic",
+		},
+		{
+			name:           "NonMatchingOutputShouldPanic",
+			result:         createSuccessfulExecutionResult(),
+			expectedOutput: "failure",
+			shouldPanic:    true,
+			description:    "Non-matching output should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionOutput to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionOutput(mockT, tc.result, tc.expectedOutput)
+			} else {
+				// For matching cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionOutput(mockT, tc.result, tc.expectedOutput)
+			}
+		})
+	}
+}
+
+func TestAssertExecutionOutputJSON(t *testing.T) {
+	tests := []struct {
+		name        string
+		result      *ExecutionResult
+		expected    map[string]interface{}
+		shouldPanic bool
+		description string
+	}{
+		{
+			name:        "MatchingJSONShouldNotPanic",
+			result:      createSuccessfulExecutionResult(),
+			expected:    map[string]interface{}{"result": "success", "message": "Hello, World!"},
+			shouldPanic: false,
+			description: "Matching JSON should not cause panic",
+		},
+		{
+			name:        "NonMatchingJSONShouldPanic",
+			result:      createSuccessfulExecutionResult(),
+			expected:    map[string]interface{}{"result": "failure"},
+			shouldPanic: true,
+			description: "Non-matching JSON should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionOutputJSON to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionOutputJSON(mockT, tc.result, tc.expected)
+			} else {
+				// For matching cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionOutputJSON(mockT, tc.result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestAssertExecutionTime(t *testing.T) {
+	tests := []struct {
+		name        string
+		result      *ExecutionResult
+		minTime     time.Duration
+		maxTime     time.Duration
+		shouldPanic bool
+		description string
+	}{
+		{
+			name:        "WithinTimeLimitsShouldNotPanic",
+			result:      createSuccessfulExecutionResult(),
+			minTime:     1 * time.Second,
+			maxTime:     10 * time.Second,
+			shouldPanic: false,
+			description: "Execution time within limits should not cause panic",
+		},
+		{
+			name:        "ExceedsMaxTimeShouldPanic",
+			result:      createSuccessfulExecutionResult(),
+			minTime:     1 * time.Second,
+			maxTime:     1 * time.Second, // Less than actual execution time
+			shouldPanic: true,
+			description: "Execution time exceeding max should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionTime to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionTime(mockT, tc.result, tc.minTime, tc.maxTime)
+			} else {
+				// For valid time cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionTime(mockT, tc.result, tc.minTime, tc.maxTime)
+			}
+		})
+	}
+}
+
+func TestAssertExecutionError(t *testing.T) {
+	tests := []struct {
+		name          string
+		result        *ExecutionResult
+		expectedError string
+		shouldPanic   bool
+		description   string
+	}{
+		{
+			name:          "MatchingErrorShouldNotPanic",
+			result:        createFailedExecutionResult(),
+			expectedError: "TaskFailed",
+			shouldPanic:   false,
+			description:   "Matching error should not cause panic",
+		},
+		{
+			name:          "NonMatchingErrorShouldPanic",
+			result:        createFailedExecutionResult(),
+			expectedError: "UnknownError",
+			shouldPanic:   true,
+			description:   "Non-matching error should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionError to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionError(mockT, tc.result, tc.expectedError)
+			} else {
+				// For matching error cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionError(mockT, tc.result, tc.expectedError)
+			}
+		})
+	}
+}
+
+func TestAssertExecutionPattern(t *testing.T) {
+	tests := []struct {
+		name        string
+		result      *ExecutionResult
+		pattern     *ExecutionPattern
+		shouldPanic bool
+		description string
+	}{
+		{
+			name:        "MatchingPatternShouldNotPanic",
+			result:      createSuccessfulExecutionResult(),
+			pattern:     createTestExecutionPattern(),
+			shouldPanic: false,
+			description: "Matching pattern should not cause panic",
+		},
+		{
+			name:   "NonMatchingPatternShouldPanic",
+			result: createSuccessfulExecutionResult(),
+			pattern: &ExecutionPattern{
+				Status: &[]types.ExecutionStatus{types.ExecutionStatusFailed}[0],
+			},
+			shouldPanic: true,
+			description: "Non-matching pattern should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected AssertExecutionPattern to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionPattern(mockT, tc.result, tc.pattern)
+			} else {
+				// For matching pattern cases, test that no panic occurs
+				mockT := &MockT{errorMessages: make([]string, 0)}
+				AssertExecutionPattern(mockT, tc.result, tc.pattern)
+			}
 		})
 	}
 }

@@ -96,9 +96,16 @@ var (
 )
 
 // TestingT provides interface compatibility with testing frameworks
+// This interface is compatible with both testing.T and Terratest's testing interface
 type TestingT interface {
 	Errorf(format string, args ...interface{})
+	Error(args ...interface{}) // Added for Terratest compatibility
+	Fail()                     // Added for Terratest compatibility
 	FailNow()
+	Helper()
+	Fatal(args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Name() string
 }
 
 // TestContext represents the testing context with AWS configuration
@@ -610,78 +617,6 @@ func validateExecutionResult(result *ExecutionResult, expectSuccess bool) []stri
 	return errors
 }
 
-// History analysis functions
-
-// findHistoryEventsByType filters history events by type
-func findHistoryEventsByType(events []HistoryEvent, eventType types.HistoryEventType) []HistoryEvent {
-	var matchingEvents []HistoryEvent
-	for _, event := range events {
-		if event.Type == eventType {
-			matchingEvents = append(matchingEvents, event)
-		}
-	}
-	return matchingEvents
-}
-
-// calculateExecutionDuration calculates the total execution duration from history
-func calculateExecutionDuration(events []HistoryEvent) time.Duration {
-	var startTime, endTime time.Time
-	
-	for _, event := range events {
-		switch event.Type {
-		case types.HistoryEventTypeExecutionStarted:
-			if startTime.IsZero() {
-				startTime = event.Timestamp
-			}
-		case types.HistoryEventTypeExecutionSucceeded, types.HistoryEventTypeExecutionFailed,
-			 types.HistoryEventTypeExecutionTimedOut, types.HistoryEventTypeExecutionAborted:
-			endTime = event.Timestamp
-		}
-	}
-	
-	if !startTime.IsZero() && !endTime.IsZero() {
-		return endTime.Sub(startTime)
-	}
-	
-	return 0
-}
-
-// findFailedSteps identifies steps that failed during execution
-func findFailedSteps(events []HistoryEvent) []string {
-	var failedSteps []string
-	
-	for _, event := range events {
-		switch event.Type {
-		case types.HistoryEventTypeLambdaFunctionFailed:
-			if event.LambdaFunctionFailedEventDetails != nil {
-				failedSteps = append(failedSteps, fmt.Sprintf("Lambda function failed: %s", 
-					event.LambdaFunctionFailedEventDetails.Error))
-			}
-		case types.HistoryEventTypeTaskFailed:
-			failedSteps = append(failedSteps, "Task failed")
-		case types.HistoryEventTypeExecutionFailed:
-			if event.ExecutionFailedEventDetails != nil {
-				failedSteps = append(failedSteps, fmt.Sprintf("Execution failed: %s", 
-					event.ExecutionFailedEventDetails.Error))
-			}
-		}
-	}
-	
-	return failedSteps
-}
-
-// getRetryAttempts counts the number of retry attempts from history
-func getRetryAttempts(events []HistoryEvent) int {
-	retryCount := 0
-	
-	for _, event := range events {
-		if strings.Contains(string(event.Type), "Retry") {
-			retryCount++
-		}
-	}
-	
-	return retryCount
-}
 
 // Utility functions for AWS client operations
 
@@ -1007,11 +942,11 @@ func validateExecutionArn(executionArn string) error {
 	
 	// Basic ARN format validation
 	if !strings.HasPrefix(executionArn, "arn:aws:states:") {
-		return fmt.Errorf("%w: must start with 'arn:aws:states:'", ErrInvalidArn)
+		return fmt.Errorf("%w: invalid execution ARN format", ErrInvalidArn)
 	}
 	
 	if !strings.Contains(executionArn, ":execution:") {
-		return fmt.Errorf("%w: must contain ':execution:'", ErrInvalidArn)
+		return fmt.Errorf("%w: invalid execution ARN format", ErrInvalidArn)
 	}
 	
 	return nil
@@ -1035,32 +970,6 @@ func validateListExecutionsRequest(stateMachineArn string, statusFilter types.Ex
 	return nil
 }
 
-// Execution utility functions
-
-// processExecutionResult processes execution result for consistent output
-func processExecutionResult(result *ExecutionResult) *ExecutionResult {
-	if result == nil {
-		return nil
-	}
-	
-	// Return a copy to prevent mutation
-	processed := *result
-	
-	// Calculate execution time if not already set
-	if processed.ExecutionTime == 0 && !processed.StartDate.IsZero() && !processed.StopDate.IsZero() {
-		processed.ExecutionTime = processed.StopDate.Sub(processed.StartDate)
-	}
-	
-	return &processed
-}
-
-// calculateExecutionTime calculates the duration between start and stop times
-func calculateExecutionTime(startTime, stopTime time.Time) time.Duration {
-	if startTime.IsZero() || stopTime.IsZero() {
-		return 0
-	}
-	return stopTime.Sub(startTime)
-}
 
 // isExecutionComplete checks if an execution has reached a terminal state
 func isExecutionComplete(status types.ExecutionStatus) bool {

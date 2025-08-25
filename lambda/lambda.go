@@ -39,8 +39,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
-	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 )
 
@@ -77,9 +75,16 @@ var (
 )
 
 // TestingT provides interface compatibility with testing frameworks
+// This interface is compatible with both testing.T and Terratest's testing interface
 type TestingT interface {
 	Errorf(format string, args ...interface{})
+	Error(args ...interface{}) // Added for Terratest compatibility
+	Fail()                     // Added for Terratest compatibility
 	FailNow()
+	Helper()
+	Fatal(args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Name() string
 }
 
 // TestContext represents the testing context with AWS configuration
@@ -126,6 +131,36 @@ type FunctionConfiguration struct {
 	State           types.State
 	StateReason     string
 	Version         string
+	CodeSha256      string
+	PackageType     types.PackageType
+}
+
+// UpdateFunctionCodeResult represents the result of updating function code
+type UpdateFunctionCodeResult struct {
+	FunctionName    string
+	FunctionArn     string
+	Runtime         types.Runtime
+	Handler         string
+	Description     string
+	Timeout         int32
+	MemorySize      int32
+	LastModified    string
+	CodeSha256      string
+	Version         string
+	PackageType     types.PackageType
+}
+
+// LayerVersionInfo represents Lambda layer version information
+type LayerVersionInfo struct {
+	LayerName          string
+	LayerArn           string
+	LayerVersionArn    string
+	Version            int64
+	Description        string
+	CreatedDate        string
+	CompatibleRuntimes []types.Runtime
+	CodeSha256         string
+	CodeSize           int64
 }
 
 // LogEntry represents a parsed CloudWatch log entry
@@ -230,14 +265,14 @@ func validatePayload(payload string) error {
 	return nil
 }
 
-// createLambdaClient creates a Lambda client from the test context
-func createLambdaClient(ctx *TestContext) *lambda.Client {
-	return lambda.NewFromConfig(ctx.AwsConfig)
+// createLambdaClient creates a Lambda client from the test context using dependency injection
+func createLambdaClient(ctx *TestContext) LambdaClientInterface {
+	return globalClientFactory.CreateLambdaClient(ctx)
 }
 
-// createCloudWatchLogsClient creates a CloudWatch Logs client from the test context
-func createCloudWatchLogsClient(ctx *TestContext) *cloudwatchlogs.Client {
-	return cloudwatchlogs.NewFromConfig(ctx.AwsConfig)
+// createCloudWatchLogsClient creates a CloudWatch Logs client from the test context using dependency injection
+func createCloudWatchLogsClient(ctx *TestContext) CloudWatchLogsClientInterface {
+	return globalClientFactory.CreateCloudWatchLogsClient(ctx)
 }
 
 // logOperation logs the start of an operation for observability
@@ -351,3 +386,9 @@ func sanitizeLogResult(logResult string) string {
 	
 	return strings.Join(sanitized, "\n")
 }
+
+// Function variables for dependency injection in tests
+var (
+	functionExistsEFunc = FunctionExistsE
+	getFunctionFunc     = GetFunction
+)

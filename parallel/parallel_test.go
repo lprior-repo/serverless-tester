@@ -304,9 +304,38 @@ func (th *testHelper) Errorf(format string, args ...interface{}) {
 	th.errors = append(th.errors, fmt.Sprintf(format, args...))
 }
 
+func (th *testHelper) Error(args ...interface{}) {
+	th.failed = true
+	th.errors = append(th.errors, fmt.Sprint(args...))
+}
+
 func (th *testHelper) FailNow() {
 	th.failed = true
 	panic("test failed")
+}
+
+func (th *testHelper) Fail() {
+	th.failed = true
+}
+
+func (th *testHelper) Fatal(args ...interface{}) {
+	th.failed = true
+	th.errors = append(th.errors, fmt.Sprint(args...))
+	panic("test failed")
+}
+
+func (th *testHelper) Fatalf(format string, args ...interface{}) {
+	th.failed = true
+	th.errors = append(th.errors, fmt.Sprintf(format, args...))
+	panic("test failed")
+}
+
+func (th *testHelper) Logf(format string, args ...interface{}) {
+	// No-op for test helper
+}
+
+func (th *testHelper) Name() string {
+	return "testHelper"
 }
 
 func (th *testHelper) Helper() {}
@@ -314,8 +343,8 @@ func (th *testHelper) Helper() {}
 // Additional test for integration with vasdeference Arrange
 func TestIntegrationWithArrange(t *testing.T) {
 	t.Run("works with vasdeference TestContext and Arrange", func(t *testing.T) {
-		testCtx := sfx.NewTestContext(t)
-		arrange := sfx.NewArrange(testCtx)
+		testCtx := vasdeference.NewTestContext(t)
+		arrange := vasdeference.NewArrange(testCtx)
 		defer arrange.Cleanup()
 		
 		runner, err := NewRunner(t, Options{

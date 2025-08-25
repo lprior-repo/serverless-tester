@@ -35,6 +35,42 @@ func (m *mockTestingT) FailNow() {
 	panic("FailNow called")
 }
 
+func (m *mockTestingT) Error(args ...interface{}) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.errors = append(m.errors, fmt.Sprint(args...))
+}
+
+func (m *mockTestingT) Fail() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.failed = true
+}
+
+func (m *mockTestingT) Fatal(args ...interface{}) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.errors = append(m.errors, fmt.Sprint(args...))
+	m.failed = true
+	panic("Fatal called")
+}
+
+func (m *mockTestingT) Fatalf(format string, args ...interface{}) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.errors = append(m.errors, fmt.Sprintf(format, args...))
+	m.failed = true
+	panic("Fatalf called")
+}
+
+func (m *mockTestingT) Logf(format string, args ...interface{}) {
+	// No-op for mock - could log if needed
+}
+
+func (m *mockTestingT) Name() string {
+	return "mockTestingT"
+}
+
 func (m *mockTestingT) Helper() {}
 
 func (m *mockTestingT) getErrors() []string {
@@ -153,7 +189,7 @@ func TestWorkerPoolManagement(t *testing.T) {
 	})
 
 	t.Run("graceful shutdown with running tasks", func(t *testing.T) {
-		runner, err := NewRunner(t, Options{PoolSize: 2})
+		runner, err := NewRunner(t, Options{PoolSize: 3})
 		require.NoError(t, err)
 
 		var tasksStarted int64
@@ -170,12 +206,13 @@ func TestWorkerPoolManagement(t *testing.T) {
 		}
 
 		// Wait a bit for tasks to start
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		
 		// Cleanup should wait for running tasks to complete
 		runner.Cleanup()
 
 		assert.True(t, runner.pool.IsClosed())
+		assert.Equal(t, int64(3), atomic.LoadInt64(&tasksStarted))
 		assert.Equal(t, atomic.LoadInt64(&tasksStarted), atomic.LoadInt64(&tasksCompleted))
 	})
 }
@@ -437,7 +474,9 @@ func TestTestCaseExecution(t *testing.T) {
 	})
 
 	t.Run("timeout handling in test context", func(t *testing.T) {
-		runner, err := NewRunner(t, Options{
+		// Use mockTestingT to capture the timeout error instead of failing the test
+		mockT := &mockTestingT{}
+		runner, err := NewRunner(mockT, Options{
 			PoolSize:    1,
 			TestTimeout: 50 * time.Millisecond,
 		})
@@ -460,9 +499,18 @@ func TestTestCaseExecution(t *testing.T) {
 			},
 		}
 
+		// Expect panic from FailNow due to timeout error
+		defer func() {
+			recover()
+		}()
+
 		runner.Run(testCases)
-		// Test completes regardless of timeout due to context cancellation
+
+		// Verify timeout occurred and was reported as error
 		assert.True(t, timeoutOccurred)
+		errors := mockT.getErrors()
+		assert.Len(t, errors, 1)
+		assert.Contains(t, errors[0], "context deadline exceeded")
 	})
 
 	t.Run("test case isolation verification", func(t *testing.T) {
@@ -588,8 +636,8 @@ func TestNewRunnerE(t *testing.T) {
 	})
 
 	t.Run("NewRunnerWithArrange creates runner with existing arrange", func(t *testing.T) {
-		testCtx := sfx.NewTestContext(t)
-		arrange := sfx.NewArrange(testCtx)
+		testCtx := vasdeference.NewTestContext(t)
+		arrange := vasdeference.NewArrange(testCtx)
 		defer arrange.Cleanup()
 
 		runner, err := NewRunnerWithArrange(arrange, Options{PoolSize: 2})
@@ -601,8 +649,8 @@ func TestNewRunnerE(t *testing.T) {
 	})
 
 	t.Run("NewRunnerWithArrangeE returns same as NewRunnerWithArrange", func(t *testing.T) {
-		testCtx := sfx.NewTestContext(t)
-		arrange := sfx.NewArrange(testCtx)
+		testCtx := vasdeference.NewTestContext(t)
+		arrange := vasdeference.NewArrange(testCtx)
 		defer arrange.Cleanup()
 
 		runner, err := NewRunnerWithArrangeE(arrange, Options{PoolSize: 2})
@@ -832,8 +880,7 @@ func TestEdgeCasesAndErrorConditions(t *testing.T) {
 		require.NoError(t, err)
 		defer runner.Cleanup()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel() // Cancel immediately
+		// Test context cancellation handling
 
 		testCases := []TestCase{
 			{

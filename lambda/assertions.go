@@ -135,16 +135,19 @@ func AssertInvokeSuccess(ctx *TestContext, result *InvokeResult) {
 	if result == nil {
 		ctx.T.Errorf("Expected invocation result to be non-nil")
 		ctx.T.FailNow()
+		return
 	}
 	
 	if result.FunctionError != "" {
 		ctx.T.Errorf("Expected successful invocation, but got function error: %s", result.FunctionError)
 		ctx.T.FailNow()
+		return
 	}
 	
 	if result.StatusCode < 200 || result.StatusCode >= 300 {
 		ctx.T.Errorf("Expected successful status code (2xx), but got %d", result.StatusCode)
 		ctx.T.FailNow()
+		return
 	}
 }
 
@@ -153,11 +156,13 @@ func AssertInvokeError(ctx *TestContext, result *InvokeResult) {
 	if result == nil {
 		ctx.T.Errorf("Expected invocation result to be non-nil")
 		ctx.T.FailNow()
+		return
 	}
 	
 	if result.FunctionError == "" {
 		ctx.T.Errorf("Expected invocation to result in function error, but got none")
 		ctx.T.FailNow()
+		return
 	}
 }
 
@@ -166,12 +171,14 @@ func AssertPayloadContains(ctx *TestContext, result *InvokeResult, expectedText 
 	if result == nil {
 		ctx.T.Errorf("Expected invocation result to be non-nil")
 		ctx.T.FailNow()
+		return
 	}
 	
 	if !strings.Contains(result.Payload, expectedText) {
 		ctx.T.Errorf("Expected payload to contain '%s', but payload was: %s", 
 			expectedText, result.Payload)
 		ctx.T.FailNow()
+		return
 	}
 }
 
@@ -180,12 +187,14 @@ func AssertPayloadEquals(ctx *TestContext, result *InvokeResult, expectedPayload
 	if result == nil {
 		ctx.T.Errorf("Expected invocation result to be non-nil")
 		ctx.T.FailNow()
+		return
 	}
 	
 	if result.Payload != expectedPayload {
 		ctx.T.Errorf("Expected payload to be '%s', but got '%s'", 
 			expectedPayload, result.Payload)
 		ctx.T.FailNow()
+		return
 	}
 }
 
@@ -194,12 +203,14 @@ func AssertExecutionTimeLessThan(ctx *TestContext, result *InvokeResult, maxDura
 	if result == nil {
 		ctx.T.Errorf("Expected invocation result to be non-nil")
 		ctx.T.FailNow()
+		return
 	}
 	
 	if result.ExecutionTime >= maxDuration {
 		ctx.T.Errorf("Expected execution time to be less than %v, but got %v", 
 			maxDuration, result.ExecutionTime)
 		ctx.T.FailNow()
+		return
 	}
 }
 

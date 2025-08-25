@@ -10,7 +10,6 @@ import (
     "path/filepath"
     "regexp"
     "strings"
-    "testing"
 
     "github.com/pmezard/go-difflib/difflib"
     "vasdeference"
@@ -39,13 +38,13 @@ type Sanitizer func(data []byte) []byte
 
 // Snapshot manages snapshot testing
 type Snapshot struct {
-    t        sfx.TestingT
+    t        vasdeference.TestingT
     options  Options
     testName string
 }
 
 // New creates a new snapshot tester
-func New(t sfx.TestingT, opts ...Options) *Snapshot {
+func New(t vasdeference.TestingT, opts ...Options) *Snapshot {
     options := Options{
         SnapshotDir:      "testdata/snapshots",
         DiffContextLines: 3,
@@ -67,9 +66,9 @@ func New(t sfx.TestingT, opts ...Options) *Snapshot {
         t.FailNow()
     }
     
-    // Get test name - try to extract from testing.TB if available
+    // Get test name - try to extract from vasdeference.TestingT if available
     testName := "unknown"
-    if tb, ok := t.(testing.TB); ok {
+    if tb, ok := t.(vasdeference.TestingT); ok {
         testName = tb.Name()
     }
     
@@ -330,7 +329,7 @@ func sanitizeSnapshotName(name string) string {
 var defaultSnapshot *Snapshot
 
 // Match uses a default snapshot instance
-func Match(t sfx.TestingT, name string, data interface{}) {
+func Match(t vasdeference.TestingT, name string, data interface{}) {
     if defaultSnapshot == nil || defaultSnapshot.t != t {
         defaultSnapshot = New(t)
     }
@@ -338,7 +337,7 @@ func Match(t sfx.TestingT, name string, data interface{}) {
 }
 
 // MatchJSON uses a default snapshot instance for JSON
-func MatchJSON(t sfx.TestingT, name string, data interface{}) {
+func MatchJSON(t vasdeference.TestingT, name string, data interface{}) {
     if defaultSnapshot == nil || defaultSnapshot.t != t {
         defaultSnapshot = New(t)
     }
@@ -346,7 +345,7 @@ func MatchJSON(t sfx.TestingT, name string, data interface{}) {
 }
 
 // NewE creates a new snapshot tester with error return (Terratest pattern)
-func NewE(t sfx.TestingT, opts ...Options) (*Snapshot, error) {
+func NewE(t vasdeference.TestingT, opts ...Options) (*Snapshot, error) {
     options := Options{
         SnapshotDir:      "testdata/snapshots",
         DiffContextLines: 3,
@@ -367,9 +366,9 @@ func NewE(t sfx.TestingT, opts ...Options) (*Snapshot, error) {
         return nil, fmt.Errorf("failed to create snapshot directory: %w", err)
     }
     
-    // Get test name - try to extract from testing.TB if available
+    // Get test name - try to extract from vasdeference.TestingT if available
     testName := "unknown"
-    if tb, ok := t.(testing.TB); ok {
+    if tb, ok := t.(vasdeference.TestingT); ok {
         testName = tb.Name()
     }
     

@@ -132,7 +132,7 @@ func BuildS3Event(bucketName string, objectKey string, eventName string) CustomE
 	
 	return CustomEvent{
 		Source:       "aws.s3",
-		DetailType:   fmt.Sprintf("S3 %s", eventName),
+		DetailType:   "Object Created",
 		Detail:       string(detailJSON),
 		EventBusName: DefaultEventBusName,
 		Resources:    []string{fmt.Sprintf("arn:aws:s3:::%s/%s", bucketName, objectKey)},
@@ -199,7 +199,7 @@ func BuildDynamoDBEvent(tableName string, eventName string, record map[string]in
 	
 	return CustomEvent{
 		Source:       "aws.dynamodb",
-		DetailType:   "DynamoDB Stream Record",
+		DetailType:   "DynamoDB Table Event",
 		Detail:       string(detailJSON),
 		EventBusName: DefaultEventBusName,
 		Resources:    []string{fmt.Sprintf("arn:aws:dynamodb:us-east-1:123456789012:table/%s", tableName)},

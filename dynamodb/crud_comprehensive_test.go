@@ -67,36 +67,7 @@ func (m *MockDynamoDBClient) Scan(ctx context.Context, params *dynamodb.ScanInpu
 	return args.Get(0).(*dynamodb.ScanOutput), args.Error(1)
 }
 
-// Test data factories following TDD best practices
-func createTestItem() map[string]types.AttributeValue {
-	return map[string]types.AttributeValue{
-		"id":          &types.AttributeValueMemberS{Value: "test-id-123"},
-		"name":        &types.AttributeValueMemberS{Value: "test-name"},
-		"age":         &types.AttributeValueMemberN{Value: "25"},
-		"active":      &types.AttributeValueMemberBOOL{Value: true},
-		"email":       &types.AttributeValueMemberS{Value: "test@example.com"},
-		"tags":        &types.AttributeValueMemberSS{Value: []string{"tag1", "tag2", "tag3"}},
-		"scores":      &types.AttributeValueMemberNS{Value: []string{"85", "90", "95"}},
-		"metadata": &types.AttributeValueMemberM{
-			Value: map[string]types.AttributeValue{
-				"created_at": &types.AttributeValueMemberS{Value: "2023-01-01T00:00:00Z"},
-				"version":    &types.AttributeValueMemberN{Value: "1"},
-			},
-		},
-		"items": &types.AttributeValueMemberL{
-			Value: []types.AttributeValue{
-				&types.AttributeValueMemberS{Value: "item1"},
-				&types.AttributeValueMemberS{Value: "item2"},
-			},
-		},
-	}
-}
-
-func createTestKey() map[string]types.AttributeValue {
-	return map[string]types.AttributeValue{
-		"id": &types.AttributeValueMemberS{Value: "test-id-123"},
-	}
-}
+// Using shared test helpers from test_helpers.go
 
 func createCompositeTestKey() map[string]types.AttributeValue {
 	return map[string]types.AttributeValue{
@@ -111,7 +82,7 @@ func createCompositeTestKey() map[string]types.AttributeValue {
 func TestPutItem_WithValidItem_ShouldSucceed(t *testing.T) {
 	// RED: This test should fail initially as we don't have mocking in place
 	tableName := "test-table"
-	item := createTestItem()
+	item := createTestItem("test-id-123", "test-name", "test")
 
 	// This will fail because we're calling real AWS service
 	err := PutItemE(t, tableName, item)
@@ -160,7 +131,7 @@ func TestPutItem_WithComplexDataTypes_ShouldHandleAllAttributeTypes(t *testing.T
 
 func TestPutItem_WithConditionExpression_ShouldEnforceConditions(t *testing.T) {
 	tableName := "test-table"
-	item := createTestItem()
+	item := createTestItem("test-id-123", "test-name", "test")
 	options := PutItemOptions{
 		ConditionExpression: stringPtr("attribute_not_exists(id)"),
 		ExpressionAttributeNames: map[string]string{
@@ -178,7 +149,7 @@ func TestPutItem_WithConditionExpression_ShouldEnforceConditions(t *testing.T) {
 
 func TestPutItem_WithConditionalCheckFailure_ShouldReturnConditionalCheckFailedException(t *testing.T) {
 	tableName := "test-table"
-	item := createTestItem()
+	item := createTestItem("test-id-123", "test-name", "test")
 	options := PutItemOptions{
 		ConditionExpression: stringPtr("attribute_not_exists(id)"),
 		ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureAllOld,
@@ -192,7 +163,7 @@ func TestPutItem_WithConditionalCheckFailure_ShouldReturnConditionalCheckFailedE
 
 func TestGetItem_WithValidKey_ShouldRetrieveItem(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 
 	_, err := GetItemE(t, tableName, key)
 	
@@ -212,7 +183,7 @@ func TestGetItem_WithCompositeKey_ShouldRetrieveItem(t *testing.T) {
 
 func TestGetItem_WithProjectionExpression_ShouldReturnOnlySpecifiedAttributes(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 	options := GetItemOptions{
 		ProjectionExpression: stringPtr("#n, #a, #e"),
 		ExpressionAttributeNames: map[string]string{
@@ -244,7 +215,7 @@ func TestGetItem_WithNonExistentItem_ShouldReturnEmptyResult(t *testing.T) {
 
 func TestUpdateItem_WithValidUpdate_ShouldModifyItem(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 	updateExpression := "SET #n = :name, #a = :age ADD #s :score"
 	expressionAttributeNames := map[string]string{
 		"#n": "name",
@@ -265,7 +236,7 @@ func TestUpdateItem_WithValidUpdate_ShouldModifyItem(t *testing.T) {
 
 func TestUpdateItem_WithComplexExpressions_ShouldHandleAllOperations(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 	updateExpression := "SET #n = :name, #metadata.#version = #metadata.#version + :inc ADD #tags :newTag, #scores :newScore REMOVE #oldField DELETE #removeTag :tagToRemove"
 	expressionAttributeNames := map[string]string{
 		"#n":        "name",
@@ -297,7 +268,7 @@ func TestUpdateItem_WithComplexExpressions_ShouldHandleAllOperations(t *testing.
 
 func TestUpdateItem_WithConditionalCheckFailure_ShouldReturnConditionalCheckFailedException(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 	updateExpression := "SET #n = :name"
 	expressionAttributeNames := map[string]string{
 		"#n": "name",
@@ -318,7 +289,7 @@ func TestUpdateItem_WithConditionalCheckFailure_ShouldReturnConditionalCheckFail
 
 func TestDeleteItem_WithValidKey_ShouldRemoveItem(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 
 	err := DeleteItemE(t, tableName, key)
 	
@@ -328,7 +299,7 @@ func TestDeleteItem_WithValidKey_ShouldRemoveItem(t *testing.T) {
 
 func TestDeleteItem_WithConditionExpression_ShouldEnforceConditions(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 	options := DeleteItemOptions{
 		ConditionExpression: stringPtr("attribute_exists(id) AND #a > :minAge"),
 		ExpressionAttributeNames: map[string]string{
@@ -349,7 +320,7 @@ func TestDeleteItem_WithConditionExpression_ShouldEnforceConditions(t *testing.T
 
 func TestDeleteItem_WithConditionalCheckFailure_ShouldReturnConditionalCheckFailedException(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 	options := DeleteItemOptions{
 		ConditionExpression: stringPtr("attribute_not_exists(id)"),
 		ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureAllOld,
@@ -365,7 +336,7 @@ func TestDeleteItem_WithConditionalCheckFailure_ShouldReturnConditionalCheckFail
 
 func TestPutItem_WithInvalidTableName_ShouldReturnValidationException(t *testing.T) {
 	tableName := "" // Invalid empty table name
-	item := createTestItem()
+	item := createTestItem("test-id-123", "test-name", "test")
 
 	err := PutItemE(t, tableName, item)
 	
@@ -393,7 +364,7 @@ func TestGetItem_WithEmptyKey_ShouldReturnValidationException(t *testing.T) {
 
 func TestUpdateItem_WithInvalidUpdateExpression_ShouldReturnValidationException(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 	updateExpression := "INVALID EXPRESSION"
 
 	_, err := UpdateItemE(t, tableName, key, updateExpression, nil, nil)
@@ -490,7 +461,7 @@ func TestPutItem_WithSpecialCharacters_ShouldHandleUnicodeAndSpecialChars(t *tes
 
 func TestGetItem_WithAttributesToGet_ShouldReturnOnlyRequestedAttributes(t *testing.T) {
 	tableName := "test-table"
-	key := createTestKey()
+	key := createTestKey("test-id-123")
 	options := GetItemOptions{
 		AttributesToGet: []string{"id", "name", "email"},
 		ConsistentRead:  boolPtr(false),

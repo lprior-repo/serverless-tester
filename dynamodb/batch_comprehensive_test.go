@@ -9,52 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test data factories for batch operations
+// Using shared test helpers from test_helpers.go
 
-func createBatchWriteRequests(numItems int) []types.WriteRequest {
-	requests := make([]types.WriteRequest, numItems)
-	
-	for i := 0; i < numItems; i++ {
-		if i%2 == 0 {
-			// Put request
-			requests[i] = types.WriteRequest{
-				PutRequest: &types.PutRequest{
-					Item: map[string]types.AttributeValue{
-						"id":          &types.AttributeValueMemberS{Value: fmt.Sprintf("batch-put-%03d", i+1)},
-						"name":        &types.AttributeValueMemberS{Value: fmt.Sprintf("Batch Item %d", i+1)},
-						"type":        &types.AttributeValueMemberS{Value: "put"},
-						"batch_num":   &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i+1)},
-						"created_at":  &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
-						"data":        &types.AttributeValueMemberS{Value: fmt.Sprintf("batch data for item %d", i+1)},
-					},
-				},
-			}
-		} else {
-			// Delete request
-			requests[i] = types.WriteRequest{
-				DeleteRequest: &types.DeleteRequest{
-					Key: map[string]types.AttributeValue{
-						"id": &types.AttributeValueMemberS{Value: fmt.Sprintf("batch-delete-%03d", i+1)},
-					},
-				},
-			}
-		}
-	}
-	
-	return requests
-}
-
-func createBatchGetKeys(numKeys int) []map[string]types.AttributeValue {
-	keys := make([]map[string]types.AttributeValue, numKeys)
-	
-	for i := 0; i < numKeys; i++ {
-		keys[i] = map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: fmt.Sprintf("batch-get-%03d", i+1)},
-		}
-	}
-	
-	return keys
-}
 
 func createComplexBatchGetKeys() []map[string]types.AttributeValue {
 	return []map[string]types.AttributeValue{
@@ -73,7 +29,7 @@ func createComplexBatchGetKeys() []map[string]types.AttributeValue {
 	}
 }
 
-func createLargeBatchWriteRequests() []types.WriteRequest {
+func createLargeBatchWriteRequestsForComprehensive() []types.WriteRequest {
 	requests := make([]types.WriteRequest, 25) // DynamoDB limit is 25 items per batch
 	
 	for i := 0; i < 25; i++ {
@@ -148,7 +104,7 @@ func TestBatchWriteItem_WithMixedOperations_ShouldHandlePutAndDelete(t *testing.
 
 func TestBatchWriteItem_WithOptions_ShouldApplyOptionsCorrectly(t *testing.T) {
 	tableName := "test-table"
-	writeRequests := createBatchWriteRequests(5)
+	writeRequests := createBatchWriteRequestsWithSize(5)
 	options := BatchWriteItemOptions{
 		ReturnConsumedCapacity:      types.ReturnConsumedCapacityTotal,
 		ReturnItemCollectionMetrics: types.ReturnItemCollectionMetricsSize,
@@ -172,7 +128,7 @@ func TestBatchWriteItem_WithMaxItems_ShouldHandle25ItemLimit(t *testing.T) {
 
 func TestBatchWriteItem_WithTooManyItems_ShouldReturnValidationException(t *testing.T) {
 	tableName := "test-table"
-	writeRequests := createBatchWriteRequests(26) // Exceeds 25 item limit
+	writeRequests := createBatchWriteRequestsWithSize(26) // Exceeds 25 item limit
 
 	_, err := BatchWriteItemE(t, tableName, writeRequests)
 	
@@ -194,7 +150,7 @@ func TestBatchWriteItem_WithEmptyRequests_ShouldReturnValidationException(t *tes
 
 func TestBatchGetItem_WithMultipleKeys_ShouldRetrieveAllItems(t *testing.T) {
 	tableName := "test-table"
-	keys := createBatchGetKeys(10)
+	keys := createBatchGetKeysWithSize(10)
 
 	_, err := BatchGetItemE(t, tableName, keys)
 	
@@ -214,7 +170,7 @@ func TestBatchGetItem_WithComplexKeys_ShouldHandleCompositeKeys(t *testing.T) {
 
 func TestBatchGetItem_WithOptions_ShouldApplyOptionsCorrectly(t *testing.T) {
 	tableName := "test-table"
-	keys := createBatchGetKeys(5)
+	keys := createBatchGetKeysWithSize(5)
 	options := BatchGetItemOptions{
 		ProjectionExpression: stringPtr("#n, #t, #d"),
 		ExpressionAttributeNames: map[string]string{
@@ -234,7 +190,7 @@ func TestBatchGetItem_WithOptions_ShouldApplyOptionsCorrectly(t *testing.T) {
 
 func TestBatchGetItem_WithMaxKeys_ShouldHandle100KeyLimit(t *testing.T) {
 	tableName := "test-table"
-	keys := createBatchGetKeys(100) // Maximum allowed
+	keys := createBatchGetKeysWithSize(100) // Maximum allowed
 
 	_, err := BatchGetItemE(t, tableName, keys)
 	
@@ -244,7 +200,7 @@ func TestBatchGetItem_WithMaxKeys_ShouldHandle100KeyLimit(t *testing.T) {
 
 func TestBatchGetItem_WithTooManyKeys_ShouldReturnValidationException(t *testing.T) {
 	tableName := "test-table"
-	keys := createBatchGetKeys(101) // Exceeds 100 key limit
+	keys := createBatchGetKeysWithSize(101) // Exceeds 100 key limit
 
 	_, err := BatchGetItemE(t, tableName, keys)
 	
@@ -266,7 +222,7 @@ func TestBatchGetItem_WithEmptyKeys_ShouldReturnValidationException(t *testing.T
 
 func TestBatchWriteItemWithRetry_WithUnprocessedItems_ShouldRetryAutomatically(t *testing.T) {
 	tableName := "test-table"
-	writeRequests := createBatchWriteRequests(10)
+	writeRequests := createBatchWriteRequestsWithSize(10)
 	maxRetries := 3
 
 	err := BatchWriteItemWithRetryE(t, tableName, writeRequests, maxRetries)
@@ -277,7 +233,7 @@ func TestBatchWriteItemWithRetry_WithUnprocessedItems_ShouldRetryAutomatically(t
 
 func TestBatchWriteItemWithRetry_WithMaxRetries_ShouldRespectRetryLimit(t *testing.T) {
 	tableName := "test-table"
-	writeRequests := createBatchWriteRequests(5)
+	writeRequests := createBatchWriteRequestsWithSize(5)
 	maxRetries := 5
 
 	start := time.Now()
@@ -293,7 +249,7 @@ func TestBatchWriteItemWithRetry_WithMaxRetries_ShouldRespectRetryLimit(t *testi
 
 func TestBatchWriteItemWithRetry_WithZeroRetries_ShouldNotRetry(t *testing.T) {
 	tableName := "test-table"
-	writeRequests := createBatchWriteRequests(3)
+	writeRequests := createBatchWriteRequestsWithSize(3)
 	maxRetries := 0
 
 	start := time.Now()
@@ -309,7 +265,7 @@ func TestBatchWriteItemWithRetry_WithZeroRetries_ShouldNotRetry(t *testing.T) {
 
 func TestBatchGetItemWithRetry_WithUnprocessedKeys_ShouldRetryAutomatically(t *testing.T) {
 	tableName := "test-table"
-	keys := createBatchGetKeys(20)
+	keys := createBatchGetKeysWithSize(20)
 	maxRetries := 3
 
 	_, err := BatchGetItemWithRetryE(t, tableName, keys, maxRetries)
@@ -320,7 +276,7 @@ func TestBatchGetItemWithRetry_WithUnprocessedKeys_ShouldRetryAutomatically(t *t
 
 func TestBatchGetItemWithRetryAndOptions_WithAllParameters_ShouldApplyOptionsAndRetry(t *testing.T) {
 	tableName := "test-table"
-	keys := createBatchGetKeys(15)
+	keys := createBatchGetKeysWithSize(15)
 	maxRetries := 2
 	options := BatchGetItemOptions{
 		ProjectionExpression: stringPtr("#n, #i"),
@@ -429,7 +385,7 @@ func TestBatchWriteItem_PerformanceBenchmark_With25Items(t *testing.T) {
 	}
 
 	tableName := "performance-test-table"
-	writeRequests := createBatchWriteRequests(25)
+	writeRequests := createBatchWriteRequestsWithSize(25)
 
 	start := time.Now()
 	_, err := BatchWriteItemE(t, tableName, writeRequests)
@@ -446,7 +402,7 @@ func TestBatchGetItem_PerformanceBenchmark_With100Keys(t *testing.T) {
 	}
 
 	tableName := "performance-test-table"
-	keys := createBatchGetKeys(100)
+	keys := createBatchGetKeysWithSize(100)
 
 	start := time.Now()
 	_, err := BatchGetItemE(t, tableName, keys)
@@ -518,7 +474,7 @@ func TestBatchWriteItem_WithMoreThan25Items_ShouldRequireChunking(t *testing.T) 
 	tableName := "test-table"
 	
 	// Create 50 items that would need to be split into 2 batches
-	writeRequests := createBatchWriteRequests(50)
+	writeRequests := createBatchWriteRequestsWithSize(50)
 
 	// The current implementation doesn't handle chunking automatically
 	// This test demonstrates the need for chunking logic
@@ -532,7 +488,7 @@ func TestBatchGetItem_WithMoreThan100Keys_ShouldRequireChunking(t *testing.T) {
 	tableName := "test-table"
 	
 	// Create 150 keys that would need to be split into 2 batches
-	keys := createBatchGetKeys(150)
+	keys := createBatchGetKeysWithSize(150)
 
 	// The current implementation doesn't handle chunking automatically
 	// This test demonstrates the need for chunking logic
@@ -546,7 +502,7 @@ func TestBatchGetItem_WithMoreThan100Keys_ShouldRequireChunking(t *testing.T) {
 
 func TestBatchWriteItem_WithInvalidTableName_ShouldReturnResourceNotFoundException(t *testing.T) {
 	tableName := "non-existent-table"
-	writeRequests := createBatchWriteRequests(3)
+	writeRequests := createBatchWriteRequestsWithSize(3)
 
 	_, err := BatchWriteItemE(t, tableName, writeRequests)
 	
@@ -556,7 +512,7 @@ func TestBatchWriteItem_WithInvalidTableName_ShouldReturnResourceNotFoundExcepti
 
 func TestBatchGetItem_WithInvalidTableName_ShouldReturnResourceNotFoundException(t *testing.T) {
 	tableName := "non-existent-table"
-	keys := createBatchGetKeys(3)
+	keys := createBatchGetKeysWithSize(3)
 
 	_, err := BatchGetItemE(t, tableName, keys)
 	
@@ -616,7 +572,7 @@ func TestBatchWriteItem_WithMixedTableOperations_ShouldOnlyAllowSingleTable(t *t
 	// This test shows that our current API only supports single table operations
 	// In AWS, you can batch across multiple tables, but our wrapper doesn't support it
 	tableName := "single-table-only"
-	writeRequests := createBatchWriteRequests(5)
+	writeRequests := createBatchWriteRequestsWithSize(5)
 
 	_, err := BatchWriteItemE(t, tableName, writeRequests)
 	
@@ -636,7 +592,7 @@ func TestBatchWriteItem_WithProvisionedThroughput_ShouldRespectCapacity(t *testi
 	// Simulate many batch operations that might exceed provisioned capacity
 	numBatches := 10
 	for i := 0; i < numBatches; i++ {
-		writeRequests := createBatchWriteRequests(20)
+		writeRequests := createBatchWriteRequestsWithSize(20)
 		_, err := BatchWriteItemE(t, tableName, writeRequests)
 		
 		// Should fail without proper mocking
@@ -652,7 +608,7 @@ func TestBatchWriteItem_WithProvisionedThroughput_ShouldRespectCapacity(t *testi
 
 func TestBatchOperations_RetryBehavior_ShouldImplementExponentialBackoff(t *testing.T) {
 	tableName := "throttled-table"
-	writeRequests := createBatchWriteRequests(10)
+	writeRequests := createBatchWriteRequestsWithSize(10)
 	
 	start := time.Now()
 	err := BatchWriteItemWithRetryE(t, tableName, writeRequests, 3)

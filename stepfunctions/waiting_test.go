@@ -148,7 +148,7 @@ func TestPollUntilComplete(t *testing.T) {
 
 // Tests for poll configuration and utilities
 
-func TestCalculateNextPollInterval(t *testing.T) {
+func TestCalculateNextPollIntervalWaiting(t *testing.T) {
 	tests := []struct {
 		name              string
 		currentAttempt    int
@@ -218,7 +218,7 @@ func TestCalculateNextPollInterval(t *testing.T) {
 	}
 }
 
-func TestShouldContinuePolling(t *testing.T) {
+func TestShouldContinuePollingWaiting(t *testing.T) {
 	tests := []struct {
 		name           string
 		attempt        int

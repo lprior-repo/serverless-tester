@@ -409,6 +409,194 @@ func TestValidateStateMachineStatus(t *testing.T) {
 	}
 }
 
+// Tests for non-E variants (panic on error functions)
+
+func TestCreateStateMachine(t *testing.T) {
+	tests := []struct {
+		name              string
+		definition        *StateMachineDefinition
+		options           *StateMachineOptions
+		shouldPanic       bool
+		expectedArn       string
+		description       string
+	}{
+		{
+			name: "ValidCreationShouldSucceed",
+			definition: &StateMachineDefinition{
+				Name:       "test-state-machine",
+				Definition: `{"Comment": "Test", "StartAt": "HelloWorld", "States": {"HelloWorld": {"Type": "Pass", "End": true}}}`,
+				RoleArn:    "arn:aws:iam::123456789012:role/StepFunctionsRole",
+				Type:       types.StateMachineTypeStandard,
+			},
+			options:     createTestStateMachineOptions(),
+			shouldPanic: false,
+			expectedArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+			description: "Valid state machine creation should succeed without panic",
+		},
+		{
+			name: "InvalidNameShouldPanic",
+			definition: &StateMachineDefinition{
+				Name:       "", // Invalid name
+				Definition: `{"Comment": "Test", "StartAt": "HelloWorld", "States": {"HelloWorld": {"Type": "Pass", "End": true}}}`,
+				RoleArn:    "arn:aws:iam::123456789012:role/StepFunctionsRole",
+				Type:       types.StateMachineTypeStandard,
+			},
+			options:     nil,
+			shouldPanic: true,
+			description: "Invalid state machine name should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected CreateStateMachine to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				// This should panic due to validation failure, we can't test with actual AWS call
+				testCtx := &TestContext{T: &MockT{errorMessages: make([]string, 0)}}
+				CreateStateMachine(testCtx, tc.definition, tc.options)
+			} else {
+				// For valid cases, we can't test the actual AWS call without mocking
+				// but we can test that validation passes
+				err := validateStateMachineCreation(tc.definition, tc.options)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+func TestDescribeStateMachine(t *testing.T) {
+	tests := []struct {
+		name            string
+		stateMachineArn string
+		shouldPanic     bool
+		description     string
+	}{
+		{
+			name:            "ValidArnShouldSucceed",
+			stateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+			shouldPanic:     false,
+			description:     "Valid state machine ARN should succeed without panic",
+		},
+		{
+			name:            "InvalidArnShouldPanic",
+			stateMachineArn: "", // Invalid ARN
+			shouldPanic:     true,
+			description:     "Invalid state machine ARN should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected DescribeStateMachine to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{errorMessages: make([]string, 0)}}
+				DescribeStateMachine(testCtx, tc.stateMachineArn)
+			} else {
+				// For valid cases, we can only test that validation passes
+				err := validateStateMachineArn(tc.stateMachineArn)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+func TestDeleteStateMachine(t *testing.T) {
+	tests := []struct {
+		name            string
+		stateMachineArn string
+		shouldPanic     bool
+		description     string
+	}{
+		{
+			name:            "ValidArnShouldSucceed",
+			stateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+			shouldPanic:     false,
+			description:     "Valid state machine ARN should succeed without panic",
+		},
+		{
+			name:            "InvalidArnShouldPanic",
+			stateMachineArn: "invalid-arn",
+			shouldPanic:     true,
+			description:     "Invalid state machine ARN should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected DeleteStateMachine to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{errorMessages: make([]string, 0)}}
+				DeleteStateMachine(testCtx, tc.stateMachineArn)
+			} else {
+				// For valid cases, we can only test that validation passes
+				err := validateStateMachineArn(tc.stateMachineArn)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+func TestListStateMachines(t *testing.T) {
+	tests := []struct {
+		name        string
+		maxResults  int32
+		shouldPanic bool
+		description string
+	}{
+		{
+			name:        "ValidMaxResultsShouldSucceed",
+			maxResults:  100,
+			shouldPanic: false,
+			description: "Valid max results should succeed without panic",
+		},
+		{
+			name:        "InvalidMaxResultsShouldPanic",
+			maxResults:  -1,
+			shouldPanic: true,
+			description: "Invalid max results should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected ListStateMachines to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{errorMessages: make([]string, 0)}}
+				ListStateMachines(testCtx, tc.maxResults)
+			} else {
+				// For valid cases, we can only test that validation passes
+				err := validateMaxResults(tc.maxResults)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+
 // Benchmark tests for state machine operations
 
 func BenchmarkValidateStateMachineNameForStateMachines(b *testing.B) {

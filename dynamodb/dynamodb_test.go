@@ -164,6 +164,3 @@ func TestUpdateItem_WithOptions_ShouldApplyConditionExpression(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-func stringPtr(s string) *string {
-	return &s
-}

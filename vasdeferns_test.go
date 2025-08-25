@@ -1,4 +1,4 @@
-package sfx
+package vasdeference
 
 import (
 	"os"

@@ -104,11 +104,13 @@ func CreateRuleE(ctx *TestContext, config RuleConfig) (RuleResult, error) {
 		
 		// Success case
 		result := RuleResult{
-			Name:         config.Name,
-			RuleArn:      safeString(response.RuleArn),
+			Name:               config.Name,
+			RuleArn:            safeString(response.RuleArn),
 			State:        state,
-			Description:  config.Description,
-			EventBusName: eventBusName,
+			Description:        config.Description,
+			EventBusName:       eventBusName,
+			EventPattern:       config.EventPattern,
+			ScheduleExpression: config.ScheduleExpression,
 		}
 		
 		logResult("create_rule", true, time.Since(startTime), nil)
@@ -241,11 +243,13 @@ func DescribeRuleE(ctx *TestContext, ruleName string, eventBusName string) (Rule
 		
 		// Success case
 		result := RuleResult{
-			Name:         safeString(response.Name),
-			RuleArn:      safeString(response.Arn),
-			State:        response.State,
-			Description:  safeString(response.Description),
-			EventBusName: safeString(response.EventBusName),
+			Name:               safeString(response.Name),
+			RuleArn:            safeString(response.Arn),
+			State:              response.State,
+			Description:        safeString(response.Description),
+			EventBusName:       safeString(response.EventBusName),
+			EventPattern:       safeString(response.EventPattern),
+			ScheduleExpression: safeString(response.ScheduleExpression),
 		}
 		
 		logResult("describe_rule", true, time.Since(startTime), nil)
@@ -333,11 +337,13 @@ func ListRulesE(ctx *TestContext, eventBusName string) ([]RuleResult, error) {
 		results := make([]RuleResult, len(response.Rules))
 		for i, rule := range response.Rules {
 			results[i] = RuleResult{
-				Name:         safeString(rule.Name),
-				RuleArn:      safeString(rule.Arn),
+				Name:               safeString(rule.Name),
+				RuleArn:            safeString(rule.Arn),
 				State:        rule.State,
-				Description:  safeString(rule.Description),
-				EventBusName: safeString(rule.EventBusName),
+				Description:        safeString(rule.Description),
+				EventBusName:       safeString(rule.EventBusName),
+				EventPattern:       safeString(rule.EventPattern),
+				ScheduleExpression: safeString(rule.ScheduleExpression),
 			}
 		}
 		
@@ -413,4 +419,115 @@ func updateRuleStateE(ctx *TestContext, ruleName string, eventBusName string, st
 	
 	logResult(operation, false, time.Since(startTime), lastErr)
 	return fmt.Errorf("failed to update rule state after %d attempts: %w", config.MaxAttempts, lastErr)
+}
+
+// UpdateRule updates an EventBridge rule and panics on error (Terratest pattern)
+func UpdateRule(ctx *TestContext, config RuleConfig) RuleResult {
+	result, err := UpdateRuleE(ctx, config)
+	if err != nil {
+		ctx.T.Errorf("UpdateRule failed: %v", err)
+		ctx.T.FailNow()
+	}
+	return result
+}
+
+// UpdateRuleE updates an EventBridge rule and returns error
+func UpdateRuleE(ctx *TestContext, config RuleConfig) (RuleResult, error) {
+	startTime := time.Now()
+	
+	logOperation("update_rule", map[string]interface{}{
+		"rule_name":    config.Name,
+		"event_bus":    config.EventBusName,
+		"description":  config.Description,
+	})
+	
+	// Validate rule configuration
+	if config.Name == "" {
+		err := fmt.Errorf("rule name cannot be empty")
+		logResult("update_rule", false, time.Since(startTime), err)
+		return RuleResult{}, err
+	}
+	
+	// Validate event pattern if provided
+	if config.EventPattern != "" && !ValidateEventPattern(config.EventPattern) {
+		err := fmt.Errorf("%w: %s", ErrInvalidEventPattern, config.EventPattern)
+		logResult("update_rule", false, time.Since(startTime), err)
+		return RuleResult{}, err
+	}
+	
+	// Set default event bus if not specified
+	eventBusName := config.EventBusName
+	if eventBusName == "" {
+		eventBusName = DefaultEventBusName
+	}
+	
+	// Set default state if not specified
+	state := config.State
+	if state == "" {
+		state = RuleStateEnabled
+	}
+	
+	client := createEventBridgeClient(ctx)
+	
+	// Update the rule using PutRule (same as create, but for existing rule)
+	input := &eventbridge.PutRuleInput{
+		Name:         &config.Name,
+		Description:  &config.Description,
+		EventBusName: &eventBusName,
+		State:        state,
+	}
+	
+	// Set either event pattern or schedule expression
+	if config.EventPattern != "" {
+		input.EventPattern = &config.EventPattern
+	}
+	if config.ScheduleExpression != "" {
+		input.ScheduleExpression = &config.ScheduleExpression
+	}
+	
+	// Add tags if specified
+	if len(config.Tags) > 0 {
+		tags := make([]types.Tag, 0, len(config.Tags))
+		for key, value := range config.Tags {
+			tags = append(tags, types.Tag{
+				Key:   aws.String(key),
+				Value: aws.String(value),
+			})
+		}
+		input.Tags = tags
+	}
+	
+	// Execute with retry logic
+	retryConfig := defaultRetryConfig()
+	var lastErr error
+	
+	for attempt := 0; attempt < retryConfig.MaxAttempts; attempt++ {
+		if attempt > 0 {
+			delay := calculateBackoffDelay(attempt-1, retryConfig)
+			time.Sleep(delay)
+		}
+		
+		response, err := client.PutRule(context.Background(), input)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		
+		// Success case
+		result := RuleResult{
+			Name:               config.Name,
+			RuleArn:            safeString(response.RuleArn),
+			State:        state,
+			Description:        config.Description,
+			EventBusName:       eventBusName,
+			EventPattern:       config.EventPattern,
+			ScheduleExpression: config.ScheduleExpression,
+		}
+		
+		logResult("update_rule", true, time.Since(startTime), nil)
+		return result, nil
+	}
+	
+	logResult("update_rule", false, time.Since(startTime), lastErr)
+	return RuleResult{}, fmt.Errorf("failed to update rule after %d attempts: %w", retryConfig.MaxAttempts, lastErr)
 }

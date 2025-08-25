@@ -42,6 +42,7 @@
 package eventbridge
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -97,10 +98,45 @@ var (
 	ErrEventSizeTooLarge    = errors.New("event size too large")
 )
 
+// EventBridgeAPI defines the interface for EventBridge operations to enable mocking
+type EventBridgeAPI interface {
+	PutEvents(ctx context.Context, params *eventbridge.PutEventsInput, optFns ...func(*eventbridge.Options)) (*eventbridge.PutEventsOutput, error)
+	PutRule(ctx context.Context, params *eventbridge.PutRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.PutRuleOutput, error)
+	DeleteRule(ctx context.Context, params *eventbridge.DeleteRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DeleteRuleOutput, error)
+	DescribeRule(ctx context.Context, params *eventbridge.DescribeRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DescribeRuleOutput, error)
+	EnableRule(ctx context.Context, params *eventbridge.EnableRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.EnableRuleOutput, error)
+	DisableRule(ctx context.Context, params *eventbridge.DisableRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DisableRuleOutput, error)
+	ListRules(ctx context.Context, params *eventbridge.ListRulesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error)
+	PutTargets(ctx context.Context, params *eventbridge.PutTargetsInput, optFns ...func(*eventbridge.Options)) (*eventbridge.PutTargetsOutput, error)
+	RemoveTargets(ctx context.Context, params *eventbridge.RemoveTargetsInput, optFns ...func(*eventbridge.Options)) (*eventbridge.RemoveTargetsOutput, error)
+	ListTargetsByRule(ctx context.Context, params *eventbridge.ListTargetsByRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListTargetsByRuleOutput, error)
+	CreateEventBus(ctx context.Context, params *eventbridge.CreateEventBusInput, optFns ...func(*eventbridge.Options)) (*eventbridge.CreateEventBusOutput, error)
+	DeleteEventBus(ctx context.Context, params *eventbridge.DeleteEventBusInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DeleteEventBusOutput, error)
+	DescribeEventBus(ctx context.Context, params *eventbridge.DescribeEventBusInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DescribeEventBusOutput, error)
+	ListEventBuses(ctx context.Context, params *eventbridge.ListEventBusesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListEventBusesOutput, error)
+	CreateArchive(ctx context.Context, params *eventbridge.CreateArchiveInput, optFns ...func(*eventbridge.Options)) (*eventbridge.CreateArchiveOutput, error)
+	DeleteArchive(ctx context.Context, params *eventbridge.DeleteArchiveInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DeleteArchiveOutput, error)
+	DescribeArchive(ctx context.Context, params *eventbridge.DescribeArchiveInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DescribeArchiveOutput, error)
+	ListArchives(ctx context.Context, params *eventbridge.ListArchivesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListArchivesOutput, error)
+	StartReplay(ctx context.Context, params *eventbridge.StartReplayInput, optFns ...func(*eventbridge.Options)) (*eventbridge.StartReplayOutput, error)
+	DescribeReplay(ctx context.Context, params *eventbridge.DescribeReplayInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DescribeReplayOutput, error)
+	CancelReplay(ctx context.Context, params *eventbridge.CancelReplayInput, optFns ...func(*eventbridge.Options)) (*eventbridge.CancelReplayOutput, error)
+	PutPermission(ctx context.Context, params *eventbridge.PutPermissionInput, optFns ...func(*eventbridge.Options)) (*eventbridge.PutPermissionOutput, error)
+	RemovePermission(ctx context.Context, params *eventbridge.RemovePermissionInput, optFns ...func(*eventbridge.Options)) (*eventbridge.RemovePermissionOutput, error)
+	TestEventPattern(ctx context.Context, params *eventbridge.TestEventPatternInput, optFns ...func(*eventbridge.Options)) (*eventbridge.TestEventPatternOutput, error)
+}
+
 // TestingT provides interface compatibility with testing frameworks
+// This interface is compatible with both testing.T and Terratest's testing interface
 type TestingT interface {
 	Errorf(format string, args ...interface{})
+	Error(args ...interface{}) // Added for Terratest compatibility
+	Fail()                     // Added for Terratest compatibility
 	FailNow()
+	Helper()
+	Fatal(args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Name() string
 }
 
 // TestContext represents the testing context with AWS configuration
@@ -108,6 +144,7 @@ type TestContext struct {
 	T         TestingT
 	AwsConfig aws.Config
 	Region    string
+	Client    EventBridgeAPI // Optional: allows injection of mock clients for testing
 }
 
 // CustomEvent represents a custom EventBridge event
@@ -147,11 +184,13 @@ type RuleConfig struct {
 
 // RuleResult contains the response from rule operations
 type RuleResult struct {
-	Name        string
-	RuleArn     string
-	State       types.RuleState
-	Description string
-	EventBusName string
+	Name               string
+	RuleArn            string
+	State              types.RuleState
+	Description        string
+	EventBusName       string
+	EventPattern       string
+	ScheduleExpression string
 }
 
 // TargetConfig represents EventBridge target configuration
@@ -241,7 +280,12 @@ func defaultRetryConfig() RetryConfig {
 }
 
 // createEventBridgeClient creates an EventBridge client from the test context
-func createEventBridgeClient(ctx *TestContext) *eventbridge.Client {
+func createEventBridgeClient(ctx *TestContext) EventBridgeAPI {
+	// If a mock client is provided, use it for testing
+	if ctx.Client != nil {
+		return ctx.Client
+	}
+	// Otherwise, create a real AWS client
 	return eventbridge.NewFromConfig(ctx.AwsConfig)
 }
 
@@ -300,14 +344,24 @@ func calculateBackoffDelay(attempt int, config RetryConfig) time.Duration {
 	}
 	
 	// Calculate exponential delay: BaseDelay * (Multiplier ^ attempt)
+	// Handle overflow by capping at MaxDelay early
 	multiplier := 1.0
-	for i := 0; i < attempt; i++ {
-		multiplier *= config.Multiplier
-	}
-	delay := time.Duration(float64(config.BaseDelay) * multiplier)
+	baseDelayFloat := float64(config.BaseDelay)
+	maxDelayFloat := float64(config.MaxDelay)
 	
-	// Cap at maximum delay
-	if delay > config.MaxDelay {
+	for i := 0; i < attempt; i++ {
+		nextMultiplier := multiplier * config.Multiplier
+		// Check if next multiplication would cause overflow or exceed max delay
+		if nextMultiplier > maxDelayFloat/baseDelayFloat || nextMultiplier < multiplier {
+			return config.MaxDelay
+		}
+		multiplier = nextMultiplier
+	}
+	
+	delay := time.Duration(baseDelayFloat * multiplier)
+	
+	// Cap at maximum delay as final safeguard
+	if delay > config.MaxDelay || delay < 0 { // Also check for negative overflow
 		delay = config.MaxDelay
 	}
 	

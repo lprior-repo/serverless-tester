@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/gruntwork-io/terratest/modules/retry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -252,37 +253,43 @@ func WaitForTableE(t *testing.T, tableName string, expectedStatus types.TableSta
 		return err
 	}
 
-	start := time.Now()
-	for {
-		if time.Since(start) > timeout {
-			return fmt.Errorf("timeout waiting for table %s to reach status %s", tableName, expectedStatus)
-		}
-
-		result, err := client.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
-			TableName: &tableName,
-		})
-		if err != nil {
-			// If table doesn't exist and we're waiting for it to be deleted, that's success
-			if expectedStatus == types.TableStatusDeleting {
-				var notFoundErr *types.ResourceNotFoundException
-				if errors.As(err, &notFoundErr) {
-					return nil
+	maxRetries := int(timeout.Seconds() / 2) // 2 second intervals
+	description := fmt.Sprintf("Waiting for table %s to reach status %s", tableName, expectedStatus)
+	
+	retry.DoWithRetry(
+		t,
+		description,
+		maxRetries,
+		2*time.Second,
+		func() (string, error) {
+			result, err := client.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
+				TableName: &tableName,
+			})
+			if err != nil {
+				// If table doesn't exist and we're waiting for it to be deleted, that's success
+				if expectedStatus == types.TableStatusDeleting {
+					var notFoundErr *types.ResourceNotFoundException
+					if errors.As(err, &notFoundErr) {
+						return "deleted", nil
+					}
 				}
+				return "", fmt.Errorf("failed to describe table %s: %w", tableName, err)
 			}
-			return fmt.Errorf("failed to describe table %s: %w", tableName, err)
-		}
 
-		if result.Table.TableStatus == expectedStatus {
-			return nil
-		}
+			if result.Table.TableStatus == expectedStatus {
+				return "ready", nil
+			}
 
-		// Check if table is in a terminal error state
-		if result.Table.TableStatus == types.TableStatusInaccessibleEncryptionCredentials {
-			return fmt.Errorf("table %s is in inaccessible encryption credentials state", tableName)
-		}
+			// Check if table is in a terminal error state
+			if result.Table.TableStatus == types.TableStatusInaccessibleEncryptionCredentials {
+				return "", fmt.Errorf("table %s is in inaccessible encryption credentials state", tableName)
+			}
 
-		time.Sleep(2 * time.Second)
-	}
+			return "", fmt.Errorf("table %s is in status %s, expected %s", tableName, result.Table.TableStatus, expectedStatus)
+		},
+	)
+	
+	return nil
 }
 
 // WaitForTableActive waits for a table to become active and fails the test if an error occurs
@@ -303,26 +310,32 @@ func WaitForTableDeletedE(t *testing.T, tableName string, timeout time.Duration)
 		return err
 	}
 
-	start := time.Now()
-	for {
-		if time.Since(start) > timeout {
-			return fmt.Errorf("timeout waiting for table %s to be deleted", tableName)
-		}
-
-		_, err := client.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
-			TableName: &tableName,
-		})
-		
-		if err != nil {
-			var notFoundErr *types.ResourceNotFoundException
-			if errors.As(err, &notFoundErr) {
-				return nil // Table has been deleted
+	maxRetries := int(timeout.Seconds() / 2) // 2 second intervals
+	description := fmt.Sprintf("Waiting for table %s to be deleted", tableName)
+	
+	retry.DoWithRetry(
+		t,
+		description,
+		maxRetries,
+		2*time.Second,
+		func() (string, error) {
+			_, err := client.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
+				TableName: &tableName,
+			})
+			
+			if err != nil {
+				var notFoundErr *types.ResourceNotFoundException
+				if errors.As(err, &notFoundErr) {
+					return "deleted", nil // Table has been deleted
+				}
+				return "", fmt.Errorf("unexpected error while waiting for table %s to be deleted: %w", tableName, err)
 			}
-			return fmt.Errorf("unexpected error while waiting for table %s to be deleted: %w", tableName, err)
-		}
 
-		time.Sleep(2 * time.Second)
-	}
+			return "", fmt.Errorf("table %s still exists", tableName)
+		},
+	)
+	
+	return nil
 }
 
 // ListTables lists all DynamoDB tables and fails the test if an error occurs

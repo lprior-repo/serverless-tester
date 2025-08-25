@@ -484,6 +484,380 @@ func TestParseExecutionArn(t *testing.T) {
 	}
 }
 
+// Tests for non-E variants (panic on error functions)
+
+func TestStartExecution(t *testing.T) {
+	tests := []struct {
+		name            string
+		stateMachineArn string
+		executionName   string
+		input           *Input
+		shouldPanic     bool
+		description     string
+	}{
+		{
+			name:            "ValidExecutionShouldSucceed",
+			stateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+			executionName:   "test-execution",
+			input:           NewInput().Set("message", "Hello, World!"),
+			shouldPanic:     false,
+			description:     "Valid execution should succeed without panic",
+		},
+		{
+			name:            "InvalidStateMachineArnShouldPanic",
+			stateMachineArn: "", // Invalid ARN
+			executionName:   "test-execution",
+			input:           NewInput().Set("message", "Hello, World!"),
+			shouldPanic:     true,
+			description:     "Invalid state machine ARN should cause panic",
+		},
+		{
+			name:            "InvalidExecutionNameShouldPanic",
+			stateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+			executionName:   "", // Invalid name
+			input:           NewInput().Set("message", "Hello, World!"),
+			shouldPanic:     true,
+			description:     "Invalid execution name should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected StartExecution to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{}}
+				StartExecution(testCtx, tc.stateMachineArn, tc.executionName, tc.input)
+			} else {
+				// For valid cases, test validation passes
+				var inputJSON string
+				var err error
+				if tc.input != nil && !tc.input.isEmpty() {
+					inputJSON, err = tc.input.ToJSON()
+					assert.NoError(t, err, "Input should convert to JSON without error")
+				}
+				
+				request := &StartExecutionRequest{
+					StateMachineArn: tc.stateMachineArn,
+					Name:            tc.executionName,
+					Input:           inputJSON,
+				}
+				
+				err = validateStartExecutionRequest(request)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+func TestStopExecution(t *testing.T) {
+	tests := []struct {
+		name         string
+		executionArn string
+		error        string
+		cause        string
+		shouldPanic  bool
+		description  string
+	}{
+		{
+			name:         "ValidStopShouldSucceed",
+			executionArn: "arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test-execution",
+			error:        "User requested stop",
+			cause:        "Testing stop functionality",
+			shouldPanic:  false,
+			description:  "Valid stop execution should succeed without panic",
+		},
+		{
+			name:         "InvalidExecutionArnShouldPanic",
+			executionArn: "", // Invalid ARN
+			error:        "User requested stop",
+			cause:        "Testing stop functionality",
+			shouldPanic:  true,
+			description:  "Invalid execution ARN should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected StopExecution to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{}}
+				StopExecution(testCtx, tc.executionArn, tc.error, tc.cause)
+			} else {
+				// For valid cases, test validation passes
+				err := validateStopExecutionRequest(tc.executionArn, tc.error, tc.cause)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+func TestDescribeExecution(t *testing.T) {
+	tests := []struct {
+		name         string
+		executionArn string
+		shouldPanic  bool
+		description  string
+	}{
+		{
+			name:         "ValidDescribeShouldSucceed",
+			executionArn: "arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test-execution",
+			shouldPanic:  false,
+			description:  "Valid execution ARN should succeed without panic",
+		},
+		{
+			name:         "InvalidExecutionArnShouldPanic",
+			executionArn: "", // Invalid ARN
+			shouldPanic:  true,
+			description:  "Invalid execution ARN should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected DescribeExecution to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{}}
+				DescribeExecution(testCtx, tc.executionArn)
+			} else {
+				// For valid cases, test validation passes
+				err := validateExecutionArn(tc.executionArn)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+func TestWaitForExecution(t *testing.T) {
+	tests := []struct {
+		name         string
+		executionArn string
+		waitOptions  *WaitOptions
+		shouldPanic  bool
+		description  string
+	}{
+		{
+			name:         "ValidWaitShouldSucceed",
+			executionArn: "arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test-execution",
+			waitOptions:  createTestWaitOptions(),
+			shouldPanic:  false,
+			description:  "Valid wait request should succeed without panic",
+		},
+		{
+			name:         "InvalidExecutionArnShouldPanic",
+			executionArn: "", // Invalid ARN
+			waitOptions:  createTestWaitOptions(),
+			shouldPanic:  true,
+			description:  "Invalid execution ARN should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected WaitForExecution to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{}}
+				WaitForExecution(testCtx, tc.executionArn, tc.waitOptions)
+			} else {
+				// For valid cases, test validation passes
+				err := validateWaitForExecutionRequest(tc.executionArn, tc.waitOptions)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+func TestExecuteStateMachineAndWait(t *testing.T) {
+	tests := []struct {
+		name            string
+		stateMachineArn string
+		executionName   string
+		input           *Input
+		timeout         time.Duration
+		shouldPanic     bool
+		description     string
+	}{
+		{
+			name:            "ValidExecuteAndWaitShouldSucceed",
+			stateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+			executionName:   "test-execution",
+			input:           NewInput().Set("message", "Hello, World!"),
+			timeout:         5 * time.Minute,
+			shouldPanic:     false,
+			description:     "Valid execute and wait should succeed without panic",
+		},
+		{
+			name:            "InvalidStateMachineArnShouldPanic",
+			stateMachineArn: "", // Invalid ARN
+			executionName:   "test-execution",
+			input:           NewInput().Set("message", "Hello, World!"),
+			timeout:         5 * time.Minute,
+			shouldPanic:     true,
+			description:     "Invalid state machine ARN should cause panic",
+		},
+		{
+			name:            "ZeroTimeoutShouldPanic",
+			stateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine",
+			executionName:   "test-execution",
+			input:           NewInput().Set("message", "Hello, World!"),
+			timeout:         0, // Invalid timeout
+			shouldPanic:     true,
+			description:     "Zero timeout should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected ExecuteStateMachineAndWait to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{}}
+				ExecuteStateMachineAndWait(testCtx, tc.stateMachineArn, tc.executionName, tc.input, tc.timeout)
+			} else {
+				// For valid cases, test validation passes
+				err := validateExecuteAndWaitPattern(tc.stateMachineArn, tc.executionName, tc.input, tc.timeout)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+func TestPollUntilCompleteNonE(t *testing.T) {
+	tests := []struct {
+		name         string
+		executionArn string
+		config       *PollConfig
+		shouldPanic  bool
+		description  string
+	}{
+		{
+			name:         "ValidPollShouldSucceed",
+			executionArn: "arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test-execution",
+			config: &PollConfig{
+				MaxAttempts:        10,
+				Interval:           5 * time.Second,
+				Timeout:            1 * time.Minute,
+				ExponentialBackoff: false,
+				BackoffMultiplier:  1.0,
+				MaxInterval:        30 * time.Second,
+			},
+			shouldPanic: false,
+			description: "Valid poll config should succeed without panic",
+		},
+		{
+			name:         "InvalidExecutionArnShouldPanic",
+			executionArn: "", // Invalid ARN
+			config: &PollConfig{
+				MaxAttempts:        10,
+				Interval:           5 * time.Second,
+				Timeout:            1 * time.Minute,
+				ExponentialBackoff: false,
+				BackoffMultiplier:  1.0,
+				MaxInterval:        30 * time.Second,
+			},
+			shouldPanic: true,
+			description: "Invalid execution ARN should cause panic",
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				// Test that the function panics for invalid input
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected PollUntilComplete to panic for %s, but it did not", tc.description)
+					}
+				}()
+				
+				testCtx := &TestContext{T: &MockT{}}
+				PollUntilComplete(testCtx, tc.executionArn, tc.config)
+			} else {
+				// For valid cases, test validation passes
+				err := validatePollConfig(tc.executionArn, tc.config)
+				assert.NoError(t, err, tc.description)
+			}
+		})
+	}
+}
+
+// MockT is a complete mock implementation of TestingT for testing panic behavior
+type MockT struct {
+	failed        bool
+	errorMessages []string
+}
+
+func (m *MockT) Errorf(format string, args ...interface{}) {
+	m.failed = true
+	m.errorMessages = append(m.errorMessages, format)
+}
+
+func (m *MockT) Error(args ...interface{}) {
+	m.failed = true
+	// Convert interface{} args to strings
+	for _, arg := range args {
+		if str, ok := arg.(string); ok {
+			m.errorMessages = append(m.errorMessages, str)
+		}
+	}
+}
+
+func (m *MockT) Fail() {
+	m.failed = true
+}
+
+func (m *MockT) FailNow() {
+	m.failed = true
+	panic("test failed")
+}
+
+func (m *MockT) Helper() {
+	// No-op for mock
+}
+
+func (m *MockT) Fatal(args ...interface{}) {
+	m.failed = true
+	panic("test fatal")
+}
+
+func (m *MockT) Fatalf(format string, args ...interface{}) {
+	m.failed = true
+	panic("test fatal")
+}
+
+func (m *MockT) Name() string {
+	return "MockT"
+}
+
+
 // Benchmark tests for execution operations
 
 func BenchmarkValidateStartExecutionRequest(b *testing.B) {

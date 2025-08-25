@@ -1,0 +1,102 @@
+version: '3'
+
+tasks:
+  test-all:
+    desc: Run all package tests with coverage
+    deps:
+      - test-core
+      - test-lambda  
+      - test-dynamodb
+      - test-eventbridge
+      - test-stepfunctions
+      - test-parallel
+      - test-snapshot
+      - test-testing
+
+  test-core:
+    desc: Test core package with 90% coverage target
+    cmds:
+      - mkdir -p coverage
+      - go test -v -coverprofile=coverage/core.cov . -timeout=60s
+      - "go tool cover -func=coverage/core.cov | grep 'total:' | awk '{print \"Core Coverage:\" $3}' || echo 'Core Coverage: Error'"
+
+  test-lambda:
+    desc: Test Lambda package with 90% coverage target
+    cmds:
+      - mkdir -p coverage
+      - go test -v -coverprofile=coverage/lambda.cov ./lambda/ -timeout=60s
+      - 'go tool cover -func=coverage/lambda.cov | grep "total:" | awk ''{print "Lambda Coverage:" $3}'' || echo "Lambda Coverage: Error"'
+
+  test-dynamodb:
+    desc: Test DynamoDB package with 90% coverage target
+    cmds:
+      - mkdir -p coverage
+      - go test -v -coverprofile=coverage/dynamodb.cov ./dynamodb/ -timeout=60s
+      - 'go tool cover -func=coverage/dynamodb.cov | grep "total:" | awk ''{print "DynamoDB Coverage:" $3}'' || echo "DynamoDB Coverage: Error"'
+
+  test-eventbridge:
+    desc: Test EventBridge package with 90% coverage target
+    cmds:
+      - mkdir -p coverage
+      - go test -v -coverprofile=coverage/eventbridge.cov ./eventbridge/ -timeout=60s
+      - 'go tool cover -func=coverage/eventbridge.cov | grep "total:" | awk ''{print "EventBridge Coverage:" $3}'' || echo "EventBridge Coverage: Error"'
+
+  test-stepfunctions:
+    desc: Test Step Functions package with 90% coverage target
+    cmds:
+      - mkdir -p coverage
+      - go test -v -coverprofile=coverage/stepfunctions.cov ./stepfunctions/ -timeout=60s
+      - 'go tool cover -func=coverage/stepfunctions.cov | grep "total:" | awk ''{print "StepFunctions Coverage:" $3}'' || echo "StepFunctions Coverage: Error"'
+
+  test-parallel:
+    desc: Test Parallel package with 90% coverage target
+    cmds:
+      - mkdir -p coverage
+      - go test -v -coverprofile=coverage/parallel.cov ./parallel/ -timeout=60s
+      - 'go tool cover -func=coverage/parallel.cov | grep "total:" | awk ''{print "Parallel Coverage:" $3}'' || echo "Parallel Coverage: Error"'
+
+  test-snapshot:
+    desc: Test Snapshot package with 90% coverage target
+    cmds:
+      - mkdir -p coverage
+      - go test -v -coverprofile=coverage/snapshot.cov ./snapshot/ -timeout=60s
+      - 'go tool cover -func=coverage/snapshot.cov | grep "total:" | awk ''{print "Snapshot Coverage:" $3}'' || echo "Snapshot Coverage: Error"'
+
+  test-testing:
+    desc: Test Testing infrastructure package
+    cmds:
+      - mkdir -p coverage
+      - go test -v -coverprofile=coverage/testing.cov ./testing/ -timeout=30s
+      - 'go tool cover -func=coverage/testing.cov | grep "total:" | awk ''{print "Testing Coverage:" $3}'' || echo "Testing Coverage: Error"'
+
+  coverage-report:
+    desc: Generate combined coverage report
+    deps:
+      - test-all
+    cmds:
+      - echo "=== COVERAGE SUMMARY ==="
+      - echo "mode: set" > coverage/combined.cov
+      - for f in coverage/*.cov; do [ "$f" != "coverage/combined.cov" ] && tail -n +2 "$f" >> coverage/combined.cov 2>/dev/null || true; done
+      - go tool cover -func=coverage/combined.cov | grep "total:" | awk '{print "TOTAL FRAMEWORK COVERAGE:" $3}' || echo "TOTAL: Error"
+      - go tool cover -html=coverage/combined.cov -o coverage/coverage.html
+      - echo "HTML report generated: coverage/coverage.html"
+
+  coverage-quick:
+    desc: Quick coverage check for all packages
+    cmds:
+      - mkdir -p coverage
+      - echo "🧪 Running Quick Coverage Check..."
+      - go test -coverprofile=coverage/core.cov . -timeout=30s > /dev/null 2>&1 && echo "✅ Core:" $(go tool cover -func=coverage/core.cov | grep "total:" | awk '{print $3}') || echo "❌ Core: Failed"
+      - go test -coverprofile=coverage/lambda.cov ./lambda/ -timeout=30s > /dev/null 2>&1 && echo "✅ Lambda:" $(go tool cover -func=coverage/lambda.cov | grep "total:" | awk '{print $3}') || echo "❌ Lambda: Failed"
+      - go test -coverprofile=coverage/dynamodb.cov ./dynamodb/ -timeout=30s > /dev/null 2>&1 && echo "✅ DynamoDB:" $(go tool cover -func=coverage/dynamodb.cov | grep "total:" | awk '{print $3}') || echo "❌ DynamoDB: Failed"
+      - go test -coverprofile=coverage/eventbridge.cov ./eventbridge/ -timeout=30s > /dev/null 2>&1 && echo "✅ EventBridge:" $(go tool cover -func=coverage/eventbridge.cov | grep "total:" | awk '{print $3}') || echo "❌ EventBridge: Failed"
+      - go test -coverprofile=coverage/stepfunctions.cov ./stepfunctions/ -timeout=30s > /dev/null 2>&1 && echo "✅ StepFunctions:" $(go tool cover -func=coverage/stepfunctions.cov | grep "total:" | awk '{print $3}') || echo "❌ StepFunctions: Failed"
+      - go test -coverprofile=coverage/parallel.cov ./parallel/ -timeout=30s > /dev/null 2>&1 && echo "✅ Parallel:" $(go tool cover -func=coverage/parallel.cov | grep "total:" | awk '{print $3}') || echo "❌ Parallel: Failed"
+      - go test -coverprofile=coverage/snapshot.cov ./snapshot/ -timeout=30s > /dev/null 2>&1 && echo "✅ Snapshot:" $(go tool cover -func=coverage/snapshot.cov | grep "total:" | awk '{print $3}') || echo "❌ Snapshot: Failed"
+      - go test -coverprofile=coverage/testing.cov ./testing/ -timeout=30s > /dev/null 2>&1 && echo "✅ Testing:" $(go tool cover -func=coverage/testing.cov | grep "total:" | awk '{print $3}') || echo "❌ Testing: Failed"
+
+  clean:
+    desc: Clean coverage files
+    cmds:
+      - rm -rf coverage/
+      - echo "Coverage files cleaned"

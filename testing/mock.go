@@ -10,6 +10,8 @@ import (
 type TestingT interface {
 	Helper()
 	Errorf(format string, args ...interface{})
+	Error(args ...interface{}) // Added for Terratest compatibility
+	Fail()                     // Added for Terratest compatibility
 	FailNow()
 	Logf(format string, args ...interface{})
 	Name() string
@@ -24,6 +26,7 @@ type MockTestingT struct {
 	helperCallCount   int
 	errorfCallCount   int
 	logfCallCount     int
+	failCallCount     int
 	failNowCallCount  int
 	errorMessages     []string
 	logMessages       []string
@@ -54,6 +57,21 @@ func (m *MockTestingT) Errorf(format string, args ...interface{}) {
 	defer m.mu.Unlock()
 	m.errorfCallCount++
 	m.errorMessages = append(m.errorMessages, fmt.Sprintf(format, args...))
+}
+
+// Error implements TestingT interface for Terratest compatibility
+func (m *MockTestingT) Error(args ...interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.errorfCallCount++
+	m.errorMessages = append(m.errorMessages, fmt.Sprint(args...))
+}
+
+// Fail implements TestingT interface for Terratest compatibility
+func (m *MockTestingT) Fail() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failCallCount++
 }
 
 // FailNow implements TestingT interface

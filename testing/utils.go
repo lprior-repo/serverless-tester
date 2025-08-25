@@ -11,7 +11,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	awstest "github.com/gruntwork-io/terratest/modules/aws"
+	"github.com/gruntwork-io/terratest/modules/random"
 )
+
+// Use TestingT interface from mock.go to avoid duplication
 
 // TestUtils provides comprehensive testing utilities
 type TestUtils struct {
@@ -106,9 +110,68 @@ func (u *TestUtils) GenerateRandomNumber(min, max int) int {
 	return u.rng.Intn(max-min+1) + min
 }
 
-// GenerateUUID generates a new UUID
+// GenerateRandomId generates a unique ID using Terratest's random module
+// This is the preferred method for ID generation following Terratest patterns
+func (u *TestUtils) GenerateRandomId() string {
+	return random.UniqueId()
+}
+
+// GenerateUUID generates a new UUID (legacy support)
+// GenerateRandomId() is preferred for consistency with Terratest patterns
 func (u *TestUtils) GenerateUUID() string {
 	return uuid.New().String()
+}
+
+// TerratestAdapter adapts our TestingT to Terratest's TestingT interface
+type TerratestAdapter struct {
+	t TestingT
+}
+
+func (ta *TerratestAdapter) Error(args ...interface{}) {
+	ta.t.Error(args...)
+}
+
+func (ta *TerratestAdapter) Errorf(format string, args ...interface{}) {
+	ta.t.Errorf(format, args...)
+}
+
+func (ta *TerratestAdapter) Fail() {
+	ta.t.Fail()
+}
+
+func (ta *TerratestAdapter) FailNow() {
+	ta.t.FailNow()
+}
+
+func (ta *TerratestAdapter) Fatal(args ...interface{}) {
+	ta.t.Error(args...)
+	ta.t.FailNow()
+}
+
+func (ta *TerratestAdapter) Fatalf(format string, args ...interface{}) {
+	ta.t.Errorf(format, args...)
+	ta.t.FailNow()
+}
+
+func (ta *TerratestAdapter) Name() string {
+	return ta.t.Name()
+}
+
+// GetRandomRegion gets a random AWS region using Terratest's aws module
+func (u *TestUtils) GetRandomRegion(t TestingT) string {
+	adapter := &TerratestAdapter{t: t}
+	return awstest.GetRandomRegion(adapter, nil, nil)
+}
+
+// GetAccountId gets the current AWS account ID using Terratest's aws module
+func (u *TestUtils) GetAccountId(t TestingT, region string) string {
+	adapter := &TerratestAdapter{t: t}
+	accountId, err := awstest.GetAccountIdE(adapter)
+	if err != nil {
+		t.Errorf("Failed to get AWS account ID: %v", err)
+		t.FailNow()
+	}
+	return accountId
 }
 
 // Assertion Helpers

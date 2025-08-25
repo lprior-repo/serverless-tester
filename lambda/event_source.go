@@ -3,6 +3,7 @@ package lambda
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -381,15 +382,333 @@ func validateEventSourceMappingConfig(config *EventSourceMappingConfig) error {
 		return err
 	}
 	
-	// Validate batch size is within AWS limits
+	// Validate batch size based on event source type
 	if config.BatchSize > 0 {
-		// Different services have different limits, but 1000 is generally safe
-		if config.BatchSize > 1000 {
-			return fmt.Errorf("batch size %d exceeds maximum allowed (1000)", config.BatchSize)
+		eventSourceType := getEventSourceType(config.EventSourceArn)
+		switch eventSourceType {
+		case "sqs":
+			if config.BatchSize > 1000 {
+				return fmt.Errorf("SQS batch size %d exceeds maximum allowed (1000)", config.BatchSize)
+			}
+		case "kinesis":
+			if config.BatchSize > 10000 {
+				return fmt.Errorf("Kinesis batch size %d exceeds maximum allowed (10000)", config.BatchSize)
+			}
+		case "dynamodb":
+			if config.BatchSize > 1000 {
+				return fmt.Errorf("DynamoDB batch size %d exceeds maximum allowed (1000)", config.BatchSize)
+			}
+		default:
+			// For unknown event sources, use conservative limit
+			if config.BatchSize > 1000 {
+				return fmt.Errorf("batch size %d exceeds maximum allowed (1000)", config.BatchSize)
+			}
 		}
 	}
 	
 	return nil
+}
+
+// BatchConfigurationOptions represents advanced batch configuration settings
+type BatchConfigurationOptions struct {
+	BatchSize                        int32
+	MaximumBatchingWindowInSeconds   int32
+	ParallelizationFactor           int32
+	MaximumRecordAgeInSeconds       int32
+	BisectBatchOnFunctionError      bool
+	MaximumRetryAttempts            int32
+	TumblingWindowInSeconds         int32
+}
+
+// FilterCriteria represents event filtering configuration
+type FilterCriteria struct {
+	Filters []EventFilter `json:"filters"`
+}
+
+// EventFilter represents an individual filter rule
+type EventFilter struct {
+	Pattern map[string]interface{} `json:"pattern"`
+}
+
+// CreateEventSourceMappingWithBatchConfig creates an event source mapping with optimized batch configuration
+func CreateEventSourceMappingWithBatchConfig(ctx *TestContext, functionName, eventSourceArn string, batchConfig BatchConfigurationOptions) *EventSourceMappingResult {
+	result, err := CreateEventSourceMappingWithBatchConfigE(ctx, functionName, eventSourceArn, batchConfig)
+	if err != nil {
+		ctx.T.Errorf("Failed to create event source mapping with batch config: %v", err)
+		ctx.T.FailNow()
+	}
+	return result
+}
+
+// CreateEventSourceMappingWithBatchConfigE creates an event source mapping with optimized batch configuration (error-returning version)
+func CreateEventSourceMappingWithBatchConfigE(ctx *TestContext, functionName, eventSourceArn string, batchConfig BatchConfigurationOptions) (*EventSourceMappingResult, error) {
+	// Validate batch configuration for the specific event source type
+	if err := validateBatchConfigurationForEventSource(eventSourceArn, batchConfig); err != nil {
+		return nil, err
+	}
+
+	// Optimize batch configuration based on event source type
+	optimizedConfig := optimizeBatchConfigurationForEventSource(eventSourceArn, batchConfig)
+
+	config := EventSourceMappingConfig{
+		EventSourceArn:                 eventSourceArn,
+		FunctionName:                   functionName,
+		BatchSize:                      optimizedConfig.BatchSize,
+		MaximumBatchingWindowInSeconds: optimizedConfig.MaximumBatchingWindowInSeconds,
+		StartingPosition:               types.EventSourcePositionLatest,
+		Enabled:                        true,
+	}
+
+	return CreateEventSourceMappingE(ctx, config)
+}
+
+// UpdateEventSourceMappingBatchConfiguration updates batch configuration for an existing mapping
+func UpdateEventSourceMappingBatchConfiguration(ctx *TestContext, uuid string, batchConfig BatchConfigurationOptions) *EventSourceMappingResult {
+	result, err := UpdateEventSourceMappingBatchConfigurationE(ctx, uuid, batchConfig)
+	if err != nil {
+		ctx.T.Errorf("Failed to update event source mapping batch configuration: %v", err)
+		ctx.T.FailNow()
+	}
+	return result
+}
+
+// UpdateEventSourceMappingBatchConfigurationE updates batch configuration for an existing mapping (error-returning version)
+func UpdateEventSourceMappingBatchConfigurationE(ctx *TestContext, uuid string, batchConfig BatchConfigurationOptions) (*EventSourceMappingResult, error) {
+	// Get current mapping to validate event source type
+	currentMapping, err := GetEventSourceMappingE(ctx, uuid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current mapping: %w", err)
+	}
+
+	// Validate and optimize the new batch configuration
+	if err := validateBatchConfigurationForEventSource(currentMapping.EventSourceArn, batchConfig); err != nil {
+		return nil, err
+	}
+
+	optimizedConfig := optimizeBatchConfigurationForEventSource(currentMapping.EventSourceArn, batchConfig)
+
+	updateConfig := UpdateEventSourceMappingConfig{
+		BatchSize:                        &optimizedConfig.BatchSize,
+		MaximumBatchingWindowInSeconds:   &optimizedConfig.MaximumBatchingWindowInSeconds,
+	}
+
+	return UpdateEventSourceMappingE(ctx, uuid, updateConfig)
+}
+
+// ConfigureEventSourceMappingForThroughput configures an event source mapping for optimal throughput
+func ConfigureEventSourceMappingForThroughput(ctx *TestContext, functionName, eventSourceArn string) *EventSourceMappingResult {
+	result, err := ConfigureEventSourceMappingForThroughputE(ctx, functionName, eventSourceArn)
+	if err != nil {
+		ctx.T.Errorf("Failed to configure event source mapping for throughput: %v", err)
+		ctx.T.FailNow()
+	}
+	return result
+}
+
+// ConfigureEventSourceMappingForThroughputE configures an event source mapping for optimal throughput (error-returning version)
+func ConfigureEventSourceMappingForThroughputE(ctx *TestContext, functionName, eventSourceArn string) (*EventSourceMappingResult, error) {
+	// Get optimal configuration for throughput based on event source type
+	optimalConfig := getOptimalThroughputConfiguration(eventSourceArn)
+
+	return CreateEventSourceMappingWithBatchConfigE(ctx, functionName, eventSourceArn, optimalConfig)
+}
+
+// ConfigureEventSourceMappingForLatency configures an event source mapping for optimal latency
+func ConfigureEventSourceMappingForLatency(ctx *TestContext, functionName, eventSourceArn string) *EventSourceMappingResult {
+	result, err := ConfigureEventSourceMappingForLatencyE(ctx, functionName, eventSourceArn)
+	if err != nil {
+		ctx.T.Errorf("Failed to configure event source mapping for latency: %v", err)
+		ctx.T.FailNow()
+	}
+	return result
+}
+
+// ConfigureEventSourceMappingForLatencyE configures an event source mapping for optimal latency (error-returning version)
+func ConfigureEventSourceMappingForLatencyE(ctx *TestContext, functionName, eventSourceArn string) (*EventSourceMappingResult, error) {
+	// Get optimal configuration for latency based on event source type
+	optimalConfig := getOptimalLatencyConfiguration(eventSourceArn)
+
+	return CreateEventSourceMappingWithBatchConfigE(ctx, functionName, eventSourceArn, optimalConfig)
+}
+
+// validateBatchConfigurationForEventSource validates batch configuration against event source limits
+func validateBatchConfigurationForEventSource(eventSourceArn string, config BatchConfigurationOptions) error {
+	eventSourceType := getEventSourceType(eventSourceArn)
+	
+	switch eventSourceType {
+	case "sqs":
+		return validateSQSBatchConfiguration(config)
+	case "kinesis":
+		return validateKinesisBatchConfiguration(config)
+	case "dynamodb":
+		return validateDynamoDBBatchConfiguration(config)
+	default:
+		return validateDefaultBatchConfiguration(config)
+	}
+}
+
+// validateSQSBatchConfiguration validates SQS-specific batch configuration
+func validateSQSBatchConfiguration(config BatchConfigurationOptions) error {
+	if config.BatchSize < 1 || config.BatchSize > 1000 {
+		return fmt.Errorf("SQS batch size must be between 1 and 1000, got %d", config.BatchSize)
+	}
+	
+	if config.MaximumBatchingWindowInSeconds < 0 || config.MaximumBatchingWindowInSeconds > 300 {
+		return fmt.Errorf("SQS maximum batching window must be between 0 and 300 seconds, got %d", config.MaximumBatchingWindowInSeconds)
+	}
+	
+	return nil
+}
+
+// validateKinesisBatchConfiguration validates Kinesis-specific batch configuration
+func validateKinesisBatchConfiguration(config BatchConfigurationOptions) error {
+	if config.BatchSize < 1 || config.BatchSize > 10000 {
+		return fmt.Errorf("Kinesis batch size must be between 1 and 10000, got %d", config.BatchSize)
+	}
+	
+	if config.ParallelizationFactor < 1 || config.ParallelizationFactor > 100 {
+		return fmt.Errorf("Kinesis parallelization factor must be between 1 and 100, got %d", config.ParallelizationFactor)
+	}
+	
+	if config.MaximumBatchingWindowInSeconds < 0 || config.MaximumBatchingWindowInSeconds > 300 {
+		return fmt.Errorf("Kinesis maximum batching window must be between 0 and 300 seconds, got %d", config.MaximumBatchingWindowInSeconds)
+	}
+	
+	return nil
+}
+
+// validateDynamoDBBatchConfiguration validates DynamoDB-specific batch configuration
+func validateDynamoDBBatchConfiguration(config BatchConfigurationOptions) error {
+	if config.BatchSize < 1 || config.BatchSize > 1000 {
+		return fmt.Errorf("DynamoDB batch size must be between 1 and 1000, got %d", config.BatchSize)
+	}
+	
+	if config.ParallelizationFactor < 1 || config.ParallelizationFactor > 100 {
+		return fmt.Errorf("DynamoDB parallelization factor must be between 1 and 100, got %d", config.ParallelizationFactor)
+	}
+	
+	return nil
+}
+
+// validateDefaultBatchConfiguration validates default batch configuration
+func validateDefaultBatchConfiguration(config BatchConfigurationOptions) error {
+	if config.BatchSize < 1 || config.BatchSize > 1000 {
+		return fmt.Errorf("batch size must be between 1 and 1000, got %d", config.BatchSize)
+	}
+	return nil
+}
+
+// optimizeBatchConfigurationForEventSource optimizes batch configuration based on event source
+func optimizeBatchConfigurationForEventSource(eventSourceArn string, config BatchConfigurationOptions) BatchConfigurationOptions {
+	eventSourceType := getEventSourceType(eventSourceArn)
+	
+	optimized := config
+	
+	switch eventSourceType {
+	case "sqs":
+		// SQS optimization: balance between throughput and cost
+		if optimized.BatchSize == 0 {
+			optimized.BatchSize = 10 // Optimal for most SQS use cases
+		}
+		if optimized.MaximumBatchingWindowInSeconds == 0 {
+			optimized.MaximumBatchingWindowInSeconds = 1 // Low latency
+		}
+		
+	case "kinesis":
+		// Kinesis optimization: maximize parallelization for high throughput
+		if optimized.BatchSize == 0 {
+			optimized.BatchSize = 100 // Good balance for Kinesis
+		}
+		if optimized.ParallelizationFactor == 0 {
+			optimized.ParallelizationFactor = 10 // Reasonable parallelization
+		}
+		if optimized.MaximumBatchingWindowInSeconds == 0 {
+			optimized.MaximumBatchingWindowInSeconds = 5 // Buffer for efficiency
+		}
+		
+	case "dynamodb":
+		// DynamoDB streams optimization: balance between throughput and consistency
+		if optimized.BatchSize == 0 {
+			optimized.BatchSize = 50 // Good for DynamoDB streams
+		}
+		if optimized.ParallelizationFactor == 0 {
+			optimized.ParallelizationFactor = 1 // Conservative for consistency
+		}
+	}
+	
+	return optimized
+}
+
+// getOptimalThroughputConfiguration returns optimal configuration for maximum throughput
+func getOptimalThroughputConfiguration(eventSourceArn string) BatchConfigurationOptions {
+	eventSourceType := getEventSourceType(eventSourceArn)
+	
+	switch eventSourceType {
+	case "sqs":
+		return BatchConfigurationOptions{
+			BatchSize:                        1000, // Max batch size for SQS
+			MaximumBatchingWindowInSeconds:   5,    // Buffer for full batches
+		}
+	case "kinesis":
+		return BatchConfigurationOptions{
+			BatchSize:                        10000, // Max batch size for Kinesis
+			ParallelizationFactor:           100,   // Max parallelization
+			MaximumBatchingWindowInSeconds:   0,    // No buffering for max throughput
+		}
+	case "dynamodb":
+		return BatchConfigurationOptions{
+			BatchSize:                        1000, // Max batch size for DynamoDB
+			ParallelizationFactor:           100,   // Max parallelization
+		}
+	default:
+		return BatchConfigurationOptions{
+			BatchSize:                        100,
+			MaximumBatchingWindowInSeconds:   1,
+		}
+	}
+}
+
+// getOptimalLatencyConfiguration returns optimal configuration for minimum latency
+func getOptimalLatencyConfiguration(eventSourceArn string) BatchConfigurationOptions {
+	eventSourceType := getEventSourceType(eventSourceArn)
+	
+	switch eventSourceType {
+	case "sqs":
+		return BatchConfigurationOptions{
+			BatchSize:                        1, // Min batch size for lowest latency
+			MaximumBatchingWindowInSeconds:   0, // No buffering
+		}
+	case "kinesis":
+		return BatchConfigurationOptions{
+			BatchSize:                        1,   // Min batch size
+			ParallelizationFactor:           100, // Max parallelization for fast processing
+			MaximumBatchingWindowInSeconds:   0,   // No buffering
+		}
+	case "dynamodb":
+		return BatchConfigurationOptions{
+			BatchSize:                        1,   // Min batch size
+			ParallelizationFactor:           1,   // Sequential processing for consistency
+		}
+	default:
+		return BatchConfigurationOptions{
+			BatchSize:                        1,
+			MaximumBatchingWindowInSeconds:   0,
+		}
+	}
+}
+
+// getEventSourceType extracts event source type from ARN
+func getEventSourceType(eventSourceArn string) string {
+	if strings.Contains(eventSourceArn, ":sqs:") {
+		return "sqs"
+	}
+	if strings.Contains(eventSourceArn, ":kinesis:") {
+		return "kinesis"
+	}
+	if strings.Contains(eventSourceArn, ":dynamodb:") {
+		return "dynamodb"
+	}
+	return "unknown"
 }
 
 // convertToEventSourceMappingResult converts AWS event source mapping to our result type

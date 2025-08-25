@@ -612,9 +612,187 @@ func ValidateEventStructure(eventJSON string, eventType string) []string {
 				errors = append(errors, "API Gateway event must have a path")
 			}
 		}
+	case "cloudwatch":
+		var event CloudWatchEvent
+		if err := json.Unmarshal([]byte(eventJSON), &event); err != nil {
+			errors = append(errors, fmt.Sprintf("invalid CloudWatch event structure: %v", err))
+		} else {
+			// Additional validation for CloudWatch structure
+			if event.Source == "" {
+				errors = append(errors, "CloudWatch event must have a source")
+			}
+			if event.DetailType == "" {
+				errors = append(errors, "CloudWatch event must have a detail-type")
+			}
+		}
+	case "kinesis":
+		var event KinesisEvent
+		if err := json.Unmarshal([]byte(eventJSON), &event); err != nil {
+			errors = append(errors, fmt.Sprintf("invalid Kinesis event structure: %v", err))
+		} else {
+			// Additional validation for Kinesis structure
+			if len(event.Records) == 0 {
+				errors = append(errors, "Kinesis event must have at least one record")
+			} else {
+				for i, record := range event.Records {
+					if record.EventSource != "aws:kinesis" {
+						errors = append(errors, fmt.Sprintf("Kinesis record %d has wrong event source: %s", i, record.EventSource))
+						break
+					}
+					if record.Kinesis.PartitionKey == "" {
+						errors = append(errors, fmt.Sprintf("Kinesis record %d must have a partition key", i))
+						break
+					}
+				}
+			}
+		}
 	default:
 		errors = append(errors, fmt.Sprintf("unknown event type: %s", eventType))
 	}
 	
 	return errors
+}
+
+// CloudWatch event types for Lambda testing
+
+// CloudWatchEvent represents a CloudWatch event that triggers Lambda
+type CloudWatchEvent struct {
+	Version    string                 `json:"version"`
+	ID         string                 `json:"id"`
+	DetailType string                 `json:"detail-type"`
+	Source     string                 `json:"source"`
+	Account    string                 `json:"account"`
+	Time       string                 `json:"time"`
+	Region     string                 `json:"region"`
+	Detail     map[string]interface{} `json:"detail"`
+	Resources  []string               `json:"resources"`
+}
+
+// CloudWatchLogsEvent represents a CloudWatch Logs event
+type CloudWatchLogsEvent struct {
+	AwsLogs CloudWatchLogsData `json:"awslogs"`
+}
+
+// CloudWatchLogsData represents the CloudWatch Logs data
+type CloudWatchLogsData struct {
+	Data string `json:"data"`
+}
+
+// Kinesis event types for Lambda testing
+
+// KinesisEvent represents a Kinesis event that triggers Lambda
+type KinesisEvent struct {
+	Records []KinesisRecord `json:"Records"`
+}
+
+// KinesisRecord represents a single Kinesis record
+type KinesisRecord struct {
+	EventID           string          `json:"eventID"`
+	EventName         string          `json:"eventName"`
+	EventVersion      string          `json:"eventVersion"`
+	EventSource       string          `json:"eventSource"`
+	EventSourceARN    string          `json:"eventSourceARN"`
+	AwsRegion         string          `json:"awsRegion"`
+	InvokeIdentityArn string          `json:"invokeIdentityArn"`
+	Kinesis           KinesisData     `json:"kinesis"`
+}
+
+// KinesisData represents the Kinesis-specific data in a record
+type KinesisData struct {
+	ApproximateArrivalTimestamp int64  `json:"approximateArrivalTimestamp"`
+	Data                        string `json:"data"`
+	KinesisSchemaVersion        string `json:"kinesisSchemaVersion"`
+	PartitionKey                string `json:"partitionKey"`
+	SequenceNumber              string `json:"sequenceNumber"`
+}
+
+// BuildCloudWatchEvent creates a CloudWatch event for Lambda testing.
+// This is the non-error returning version that follows Terratest patterns.
+func BuildCloudWatchEvent(source string, detailType string, detail map[string]interface{}) string {
+	event, err := BuildCloudWatchEventE(source, detailType, detail)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to build CloudWatch event: %v", err))
+	}
+	return event
+}
+
+// BuildCloudWatchEventE creates a CloudWatch event for Lambda testing.
+// This is the error returning version that follows Terratest patterns.
+func BuildCloudWatchEventE(source string, detailType string, detail map[string]interface{}) (string, error) {
+	if source == "" {
+		return "", fmt.Errorf("source cannot be empty")
+	}
+	if detailType == "" {
+		detailType = "CloudWatch Event"
+	}
+	if detail == nil {
+		detail = map[string]interface{}{
+			"state": "OK",
+			"description": "Test CloudWatch event",
+		}
+	}
+	
+	event := CloudWatchEvent{
+		Version:    "0",
+		ID:         "cdc73f9d-aea9-11e3-9d5a-835b769c0d9c",
+		DetailType: detailType,
+		Source:     source,
+		Account:    "123456789012",
+		Time:       time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		Region:     "us-east-1",
+		Detail:     detail,
+		Resources:  []string{},
+	}
+	
+	return MarshalPayloadE(event)
+}
+
+// BuildKinesisEvent creates a Kinesis event for Lambda testing.
+// This is the non-error returning version that follows Terratest patterns.
+func BuildKinesisEvent(streamName string, partitionKey string, data string) string {
+	event, err := BuildKinesisEventE(streamName, partitionKey, data)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to build Kinesis event: %v", err))
+	}
+	return event
+}
+
+// BuildKinesisEventE creates a Kinesis event for Lambda testing.
+// This is the error returning version that follows Terratest patterns.
+func BuildKinesisEventE(streamName string, partitionKey string, data string) (string, error) {
+	if streamName == "" {
+		return "", fmt.Errorf("stream name cannot be empty")
+	}
+	if partitionKey == "" {
+		return "", fmt.Errorf("partition key cannot be empty")
+	}
+	if data == "" {
+		data = "Hello from Kinesis!"
+	}
+	
+	// Base64 encode the data as Kinesis requires
+	encodedData := fmt.Sprintf("%x", []byte(data))
+	
+	event := KinesisEvent{
+		Records: []KinesisRecord{
+			{
+				EventID:           "shardId-000000000000:49545115243490985018280067714973144582180062593244200961",
+				EventName:         "aws:kinesis:record",
+				EventVersion:      "1.0",
+				EventSource:       "aws:kinesis",
+				EventSourceARN:    fmt.Sprintf("arn:aws:kinesis:us-east-1:123456789012:stream/%s", streamName),
+				AwsRegion:         "us-east-1",
+				InvokeIdentityArn: "arn:aws:iam::123456789012:role/lambda-role",
+				Kinesis: KinesisData{
+					ApproximateArrivalTimestamp: time.Now().Unix() * 1000,
+					Data:                        encodedData,
+					KinesisSchemaVersion:        "1.0",
+					PartitionKey:                partitionKey,
+					SequenceNumber:              "49545115243490985018280067714973144582180062593244200961",
+				},
+			},
+		},
+	}
+	
+	return MarshalPayloadE(event)
 }

@@ -92,7 +92,20 @@ func AnalyzeExecutionHistory(history []HistoryEvent) *ExecutionAnalysis {
 // AnalyzeExecutionHistoryE analyzes execution history with error return
 func AnalyzeExecutionHistoryE(history []HistoryEvent) (*ExecutionAnalysis, error) {
 	if len(history) == 0 {
-		return nil, fmt.Errorf("cannot analyze empty history")
+		// Return empty analysis instead of error for empty history
+		return &ExecutionAnalysis{
+			StepTimings:     make(map[string]time.Duration),
+			ResourceUsage:   make(map[string]int),
+			KeyEvents:       []HistoryEvent{},
+			TotalSteps:      0,
+			CompletedSteps:  0,
+			FailedSteps:     0,
+			RetryAttempts:   0,
+			TotalDuration:   0,
+			ExecutionStatus: types.ExecutionStatusRunning,
+			FailureReason:   "",
+			FailureCause:    "",
+		}, nil
 	}
 
 	analysis := &ExecutionAnalysis{
@@ -627,4 +640,73 @@ func extractEventDetails(event HistoryEvent) interface{} {
 	default:
 		return nil
 	}
+}
+
+// Additional utility functions used by tests
+
+// calculateExecutionDuration calculates duration between first and last events
+func calculateExecutionDuration(history []HistoryEvent) time.Duration {
+	if len(history) == 0 {
+		return 0
+	}
+	
+	var earliest, latest time.Time
+	for _, event := range history {
+		if earliest.IsZero() || event.Timestamp.Before(earliest) {
+			earliest = event.Timestamp
+		}
+		if latest.IsZero() || event.Timestamp.After(latest) {
+			latest = event.Timestamp
+		}
+	}
+	
+	if earliest.IsZero() || latest.IsZero() {
+		return 0
+	}
+	
+	return latest.Sub(earliest)
+}
+
+// findHistoryEventsByType filters events by specific type
+func findHistoryEventsByType(history []HistoryEvent, eventType types.HistoryEventType) []HistoryEvent {
+	var filteredEvents []HistoryEvent
+	for _, event := range history {
+		if event.Type == eventType {
+			filteredEvents = append(filteredEvents, event)
+		}
+	}
+	return filteredEvents
+}
+
+// findFailedSteps returns all failed steps from history (wrapper function for tests)
+func findFailedSteps(history []HistoryEvent) []FailedStep {
+	steps, _ := FindFailedStepsE(history)
+	return steps
+}
+
+// getRetryAttempts counts total retry attempts in history (simple version for tests)
+func getRetryAttempts(history []HistoryEvent) int {
+	return countRetryAttempts(history)
+}
+
+// processExecutionResult processes execution result (identity function for tests)
+func processExecutionResult(result *ExecutionResult) *ExecutionResult {
+	if result == nil {
+		return nil
+	}
+	
+	// Calculate execution time if not already set
+	if result.ExecutionTime == 0 && !result.StartDate.IsZero() && !result.StopDate.IsZero() {
+		result.ExecutionTime = result.StopDate.Sub(result.StartDate)
+	}
+	
+	return result
+}
+
+// calculateExecutionTime calculates time between start and stop dates
+func calculateExecutionTime(startDate, stopDate time.Time) time.Duration {
+	if startDate.IsZero() || stopDate.IsZero() {
+		return 0
+	}
+	return stopDate.Sub(startDate)
 }

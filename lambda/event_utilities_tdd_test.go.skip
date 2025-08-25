@@ -1,0 +1,641 @@
+package lambda
+
+import (
+	//"encoding/json"
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TDD Tests for Event Utility Functions
+// Comprehensive coverage of all event manipulation and validation utilities
+
+// Test Data Factories for Event Utilities
+
+type eventValidationScenario struct {
+	name          string
+	eventJSON     string
+	eventType     string
+	expectedValid bool
+	expectedErrors []string
+}
+
+func createValidationScenarios() []eventValidationScenario {
+	return []eventValidationScenario{
+		// Valid events
+		{
+			name:          "ValidS3Event",
+			eventJSON:     BuildS3Event("bucket", "key", ""),
+			eventType:     "s3",
+			expectedValid: true,
+		},
+		{
+			name:          "ValidDynamoDBEvent", 
+			eventJSON:     BuildDynamoDBEvent("table", "", nil),
+			eventType:     "dynamodb",
+			expectedValid: true,
+		},
+		{
+			name:          "ValidSQSEvent",
+			eventJSON:     BuildSQSEvent("https://sqs.us-east-1.amazonaws.com/123/queue", ""),
+			eventType:     "sqs",
+			expectedValid: true,
+		},
+		{
+			name:          "ValidSNSEvent",
+			eventJSON:     BuildSNSEvent("arn:aws:sns:us-east-1:123:topic", ""),
+			eventType:     "sns",
+			expectedValid: true,
+		},
+		{
+			name:          "ValidAPIGatewayEvent",
+			eventJSON:     BuildAPIGatewayEvent("GET", "/", ""),
+			eventType:     "apigateway",
+			expectedValid: true,
+		},
+		{
+			name:          "ValidCloudWatchEvent",
+			eventJSON:     BuildCloudWatchEvent("aws.logs", "", nil),
+			eventType:     "cloudwatch",
+			expectedValid: true,
+		},
+		{
+			name:          "ValidKinesisEvent",
+			eventJSON:     BuildKinesisEvent("stream", "key", ""),
+			eventType:     "kinesis",
+			expectedValid: true,
+		},
+		
+		// Invalid events
+		{
+			name:          "InvalidJSON",
+			eventJSON:     `{"invalid": json}`,
+			eventType:     "s3",
+			expectedValid: false,
+			expectedErrors: []string{"invalid S3 event structure"},
+		},
+		{
+			name:          "S3EventWithWrongEventSource",
+			eventJSON:     `{"Records": [{"eventSource": "aws:sqs", "eventName": "test"}]}`,
+			eventType:     "s3",
+			expectedValid: false,
+			expectedErrors: []string{"S3 record 0 has wrong event source: aws:sqs"},
+		},
+		{
+			name:          "S3EventWithNoRecords",
+			eventJSON:     `{"Records": []}`,
+			eventType:     "s3",
+			expectedValid: false,
+			expectedErrors: []string{"S3 event must have at least one record"},
+		},
+		{
+			name:          "DynamoDBEventWithWrongEventSource",
+			eventJSON:     `{"Records": [{"eventSource": "aws:s3", "eventName": "INSERT"}]}`,
+			eventType:     "dynamodb",
+			expectedValid: false,
+			expectedErrors: []string{"DynamoDB record 0 has wrong event source: aws:s3"},
+		},
+		{
+			name:          "SQSEventWithWrongEventSource",
+			eventJSON:     `{"Records": [{"eventSource": "aws:sns", "messageId": "123"}]}`,
+			eventType:     "sqs",
+			expectedValid: false,
+			expectedErrors: []string{"SQS record 0 has wrong event source: aws:sns"},
+		},
+		{
+			name:          "SNSEventWithWrongEventSource",
+			eventJSON:     `{"Records": [{"EventSource": "aws:sqs", "Sns": {}}]}`,
+			eventType:     "sns",
+			expectedValid: false,
+			expectedErrors: []string{"SNS record 0 has wrong event source: aws:sqs"},
+		},
+		{
+			name:          "APIGatewayEventMissingHttpMethod",
+			eventJSON:     `{"path": "/", "headers": {}}`,
+			eventType:     "apigateway",
+			expectedValid: false,
+			expectedErrors: []string{"API Gateway event must have an HTTP method"},
+		},
+		{
+			name:          "APIGatewayEventMissingPath",
+			eventJSON:     `{"httpMethod": "GET", "headers": {}}`,
+			eventType:     "apigateway",
+			expectedValid: false,
+			expectedErrors: []string{"API Gateway event must have a path"},
+		},
+		{
+			name:          "CloudWatchEventMissingSource",
+			eventJSON:     `{"detail-type": "test", "detail": {}}`,
+			eventType:     "cloudwatch",
+			expectedValid: false,
+			expectedErrors: []string{"CloudWatch event must have a source"},
+		},
+		{
+			name:          "CloudWatchEventMissingDetailType",
+			eventJSON:     `{"source": "aws.logs", "detail": {}}`,
+			eventType:     "cloudwatch",
+			expectedValid: false,
+			expectedErrors: []string{"CloudWatch event must have a detail-type"},
+		},
+		{
+			name:          "KinesisEventWithWrongEventSource",
+			eventJSON:     `{"Records": [{"eventSource": "aws:s3", "kinesis": {"partitionKey": "key"}}]}`,
+			eventType:     "kinesis",
+			expectedValid: false,
+			expectedErrors: []string{"Kinesis record 0 has wrong event source: aws:s3"},
+		},
+		{
+			name:          "KinesisEventMissingPartitionKey",
+			eventJSON:     `{"Records": [{"eventSource": "aws:kinesis", "kinesis": {"data": "data"}}]}`,
+			eventType:     "kinesis",
+			expectedValid: false,
+			expectedErrors: []string{"Kinesis record 0 must have a partition key"},
+		},
+		{
+			name:          "UnknownEventType",
+			eventJSON:     `{}`,
+			eventType:     "unknown",
+			expectedValid: false,
+			expectedErrors: []string{"unknown event type: unknown"},
+		},
+	}
+}
+
+// TDD Tests for ValidateEventStructure
+
+func TestValidateEventStructure_ComprehensiveCoverage_TDD(t *testing.T) {
+	scenarios := createValidationScenarios()
+	
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			// Execute validation
+			errors := ValidateEventStructure(scenario.eventJSON, scenario.eventType)
+			
+			if scenario.expectedValid {
+				// GREEN path - should be valid
+				assert.Empty(t, errors, "Valid event should have no validation errors")
+			} else {
+				// RED path - should have errors
+				assert.NotEmpty(t, errors, "Invalid event should have validation errors")
+				
+				// Check for expected error messages
+				for _, expectedError := range scenario.expectedErrors {
+					found := false
+					for _, actualError := range errors {
+						if strings.Contains(actualError, expectedError) {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "Should contain expected error: %s", expectedError)
+				}
+			}
+		})
+	}
+}
+
+// TDD Tests for S3 Event Utilities
+
+func TestS3EventUtilities_TDD(t *testing.T) {
+	// Valid S3 event for testing
+	validS3Event := BuildS3Event("test-bucket", "test-key.txt", "s3:ObjectCreated:Put")
+	
+	t.Run("ParseS3Event_ValidEvent", func(t *testing.T) {
+		event := ParseS3Event(validS3Event)
+		
+		assert.Len(t, event.Records, 1)
+		assert.Equal(t, "test-bucket", event.Records[0].S3.Bucket.Name)
+		assert.Equal(t, "test-key.txt", event.Records[0].S3.Object.Key)
+		assert.Equal(t, "s3:ObjectCreated:Put", event.Records[0].EventName)
+	})
+	
+	t.Run("ParseS3Event_InvalidJSON_ShouldPanic", func(t *testing.T) {
+		assert.Panics(t, func() {
+			ParseS3Event(`{"invalid": json}`)
+		})
+	})
+	
+	t.Run("ParseS3EventE_ValidEvent", func(t *testing.T) {
+		event, err := ParseS3EventE(validS3Event)
+		require.NoError(t, parseErr)
+		
+		assert.Len(t, event.Records, 1)
+		assert.Equal(t, "test-bucket", event.Records[0].S3.Bucket.Name)
+		assert.Equal(t, "test-key.txt", event.Records[0].S3.Object.Key)
+	})
+	
+	t.Run("ParseS3EventE_InvalidJSON", func(t *testing.T) {
+		_, err := ParseS3EventE(`{"invalid": json}`)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse S3 event")
+	})
+	
+	t.Run("ExtractS3BucketName_ValidEvent", func(t *testing.T) {
+		bucketName := ExtractS3BucketName(validS3Event)
+		assert.Equal(t, "test-bucket", bucketName)
+	})
+	
+	t.Run("ExtractS3BucketName_InvalidEvent_ShouldPanic", func(t *testing.T) {
+		assert.Panics(t, func() {
+			ExtractS3BucketName(`{"Records": []}`) // No records
+		})
+	})
+	
+	t.Run("ExtractS3BucketNameE_ValidEvent", func(t *testing.T) {
+		bucketName, err := ExtractS3BucketNameE(validS3Event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "test-bucket", bucketName)
+	})
+	
+	t.Run("ExtractS3BucketNameE_NoRecords", func(t *testing.T) {
+		_, err := ExtractS3BucketNameE(`{"Records": []}`)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no S3 records found in event")
+	})
+	
+	t.Run("ExtractS3BucketNameE_InvalidJSON", func(t *testing.T) {
+		_, err := ExtractS3BucketNameE(`{"invalid": json}`)
+		assert.Error(t, err)
+	})
+	
+	t.Run("ExtractS3ObjectKey_ValidEvent", func(t *testing.T) {
+		objectKey := ExtractS3ObjectKey(validS3Event)
+		assert.Equal(t, "test-key.txt", objectKey)
+	})
+	
+	t.Run("ExtractS3ObjectKey_InvalidEvent_ShouldPanic", func(t *testing.T) {
+		assert.Panics(t, func() {
+			ExtractS3ObjectKey(`{"Records": []}`) // No records
+		})
+	})
+	
+	t.Run("ExtractS3ObjectKeyE_ValidEvent", func(t *testing.T) {
+		objectKey, err := ExtractS3ObjectKeyE(validS3Event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "test-key.txt", objectKey)
+	})
+	
+	t.Run("ExtractS3ObjectKeyE_NoRecords", func(t *testing.T) {
+		_, err := ExtractS3ObjectKeyE(`{"Records": []}`)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no S3 records found in event")
+	})
+}
+
+// TDD Tests for AddS3EventRecord
+
+func TestAddS3EventRecord_TDD(t *testing.T) {
+	t.Run("AddRecordToExistingEvent", func(t *testing.T) {
+		// Create initial event
+		initialEvent := BuildS3Event("bucket1", "key1.txt", "s3:ObjectCreated:Put")
+		
+		// Add second record
+		combinedEvent := AddS3EventRecord(initialEvent, "bucket2", "key2.txt", "s3:ObjectCreated:Post")
+		
+		// Parse and validate
+		event, err := ParseS3EventE(combinedEvent)
+		require.NoError(t, parseErr)
+		assert.Len(t, event.Records, 2)
+		
+		// Check first record
+		assert.Equal(t, "bucket1", event.Records[0].S3.Bucket.Name)
+		assert.Equal(t, "key1.txt", event.Records[0].S3.Object.Key)
+		assert.Equal(t, "s3:ObjectCreated:Put", event.Records[0].EventName)
+		
+		// Check second record  
+		assert.Equal(t, "bucket2", event.Records[1].S3.Bucket.Name)
+		assert.Equal(t, "key2.txt", event.Records[1].S3.Object.Key)
+		assert.Equal(t, "s3:ObjectCreated:Post", event.Records[1].EventName)
+	})
+	
+	t.Run("AddRecordToInvalidEvent_ShouldPanic", func(t *testing.T) {
+		assert.Panics(t, func() {
+			AddS3EventRecord(`{"invalid": json}`, "bucket", "key", "")
+		})
+	})
+	
+	t.Run("AddS3EventRecordE_ValidEvent", func(t *testing.T) {
+		initialEvent := BuildS3Event("bucket1", "key1.txt", "")
+		
+		combinedEvent, err := AddS3EventRecordE(initialEvent, "bucket2", "key2.txt", "s3:ObjectRemoved:Delete")
+		require.NoError(t, parseErr)
+		
+		event, err := ParseS3EventE(combinedEvent)
+		require.NoError(t, parseErr)
+		assert.Len(t, event.Records, 2)
+		assert.Equal(t, "s3:ObjectRemoved:Delete", event.Records[1].EventName)
+	})
+	
+	t.Run("AddS3EventRecordE_InvalidExistingEvent", func(t *testing.T) {
+		_, err := AddS3EventRecordE(`{"invalid": json}`, "bucket", "key", "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal existing S3 event")
+	})
+	
+	t.Run("AddS3EventRecordE_InvalidNewRecord", func(t *testing.T) {
+		validEvent := BuildS3Event("bucket1", "key1", "")
+		
+		// Try to add invalid record (empty bucket name)
+		_, err := AddS3EventRecordE(validEvent, "", "key2", "")
+		assert.Error(t, err)
+		// The error should come from BuildS3EventE validation
+	})
+}
+
+// TDD Tests for Event Parsing Edge Cases
+
+func TestEventParsing_EdgeCases_TDD(t *testing.T) {
+	t.Run("S3Event_MultipleRecordsSameBucket", func(t *testing.T) {
+		// Start with one record
+		event := BuildS3Event("shared-bucket", "file1.txt", "s3:ObjectCreated:Put")
+		
+		// Add more records to same bucket
+		event = AddS3EventRecord(event, "shared-bucket", "file2.txt", "s3:ObjectCreated:Put")
+		event = AddS3EventRecord(event, "shared-bucket", "file3.txt", "s3:ObjectCreated:Put")
+		
+		// Validate structure
+		parsedEvent, err := ParseS3EventE(event)
+		require.NoError(t, parseErr)
+		assert.Len(t, parsedEvent.Records, 3)
+		
+		// All should be from same bucket
+		for _, record := range parsedEvent.Records {
+			assert.Equal(t, "shared-bucket", record.S3.Bucket.Name)
+		}
+		
+		// Extract bucket name should return the first record's bucket
+		bucketName, err := ExtractS3BucketNameE(event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "shared-bucket", bucketName)
+	})
+	
+	t.Run("S3Event_DifferentEventTypes", func(t *testing.T) {
+		event := BuildS3Event("bucket", "created.txt", "s3:ObjectCreated:Put")
+		event = AddS3EventRecord(event, "bucket", "deleted.txt", "s3:ObjectRemoved:Delete")
+		event = AddS3EventRecord(event, "bucket", "updated.txt", "s3:ObjectCreated:Post")
+		
+		parsedEvent, err := ParseS3EventE(event)
+		require.NoError(t, parseErr)
+		assert.Len(t, parsedEvent.Records, 3)
+		
+		// Verify different event types
+		expectedTypes := []string{
+			"s3:ObjectCreated:Put",
+			"s3:ObjectRemoved:Delete", 
+			"s3:ObjectCreated:Post",
+		}
+		
+		for i, record := range parsedEvent.Records {
+			assert.Equal(t, expectedTypes[i], record.EventName)
+		}
+	})
+	
+	t.Run("S3Event_SpecialCharactersInPaths", func(t *testing.T) {
+		specialKey := "folder/subfolder/file with spaces & symbols !@#$%^&()_+.txt"
+		event := BuildS3Event("test-bucket", specialKey, "")
+		
+		extractedKey, err := ExtractS3ObjectKeyE(event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, specialKey, extractedKey)
+		
+		// Validate event structure still works
+		errors := ValidateEventStructure(event, "s3")
+		assert.Empty(t, errors)
+	})
+	
+	t.Run("S3Event_LongObjectKey", func(t *testing.T) {
+		// S3 allows keys up to 1024 bytes
+		longKey := strings.Repeat("long-key-segment-", 60) + ".txt" // ~1020 characters
+		event := BuildS3Event("test-bucket", longKey, "")
+		
+		extractedKey, err := ExtractS3ObjectKeyE(event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, longKey, extractedKey)
+		assert.Len(t, longKey, len(extractedKey))
+	})
+}
+
+// TDD Tests for Complex Event Scenarios
+
+func TestComplexEventScenarios_TDD(t *testing.T) {
+	t.Run("S3Event_JSONObjectsInEvent", func(t *testing.T) {
+		// Test that the event structure itself doesn't break with complex names
+		jsonLikeKey := `{"this": "looks", "like": "json"}.json`
+		event := BuildS3Event("json-bucket", jsonLikeKey, "s3:ObjectCreated:Put")
+		
+		// Should parse successfully
+		parsedEvent, err := ParseS3EventE(event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, jsonLikeKey, parsedEvent.Records[0].S3.Object.Key)
+		
+		// Should validate successfully
+		errors := ValidateEventStructure(event, "s3")
+		assert.Empty(t, errors)
+	})
+	
+	t.Run("MultiEventTypeValidation", func(t *testing.T) {
+		eventTests := []struct {
+			eventType string
+			buildFunc func() string
+		}{
+			{"s3", func() string { return BuildS3Event("bucket", "key", "") }},
+			{"dynamodb", func() string { return BuildDynamoDBEvent("table", "INSERT", nil) }},
+			{"sqs", func() string { return BuildSQSEvent("https://sqs.us-east-1.amazonaws.com/123/queue", "") }},
+			{"sns", func() string { return BuildSNSEvent("arn:aws:sns:us-east-1:123:topic", "") }},
+			{"apigateway", func() string { return BuildAPIGatewayEvent("GET", "/", "") }},
+			{"cloudwatch", func() string { return BuildCloudWatchEvent("aws.logs", "Log Event", nil) }},
+			{"kinesis", func() string { return BuildKinesisEvent("stream", "key", "") }},
+		}
+		
+		for _, test := range eventTests {
+			t.Run(fmt.Sprintf("EventType_%s", test.eventType), func(t *testing.T) {
+				event := test.buildFunc()
+				
+				// Should validate correctly for its type
+				errors := ValidateEventStructure(event, test.eventType)
+				assert.Empty(t, errors, "Event should validate for its correct type")
+				
+				// Should fail validation for other types (except apigateway/cloudwatch which don't have Records)
+				if test.eventType != "apigateway" && test.eventType != "cloudwatch" {
+					wrongTypeErrors := ValidateEventStructure(event, "s3")
+					if test.eventType != "s3" {
+						assert.NotEmpty(t, wrongTypeErrors, "Event should fail validation for wrong type")
+					}
+				}
+			})
+		}
+	})
+	
+	t.Run("EventValidation_PerformanceWithLargeEvents", func(t *testing.T) {
+		// Create an event with many records
+		event := BuildS3Event("bucket1", "key1", "")
+		
+		// Add many more records
+		for i := 2; i <= 100; i++ {
+			event = AddS3EventRecord(event, fmt.Sprintf("bucket%d", i), fmt.Sprintf("key%d", i), "s3:ObjectCreated:Put")
+		}
+		
+		// Validation should still work efficiently
+		errors := ValidateEventStructure(event, "s3")
+		assert.Empty(t, errors)
+		
+		// Parsing should work
+		parsedEvent, err := ParseS3EventE(event)
+		require.NoError(t, parseErr)
+		assert.Len(t, parsedEvent.Records, 100)
+		
+		// Extraction should return first record's data
+		bucketName, err := ExtractS3BucketNameE(event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "bucket1", bucketName)
+	})
+}
+
+// Benchmark Tests for Event Utilities
+
+func BenchmarkEventUtilities_TDD(b *testing.B) {
+	validS3Event := BuildS3Event("bucket", "key", "")
+	largeS3Event := validS3Event
+	
+	// Create larger event for performance testing
+	for i := 0; i < 50; i++ {
+		largeS3Event = AddS3EventRecord(largeS3Event, fmt.Sprintf("bucket%d", i), fmt.Sprintf("key%d", i), "")
+	}
+	
+	benchmarks := []struct {
+		name string
+		fn   func()
+	}{
+		{
+			name: "ValidateEventStructure_S3",
+			fn:   func() { ValidateEventStructure(validS3Event, "s3") },
+		},
+		{
+			name: "ParseS3Event",
+			fn:   func() { ParseS3Event(validS3Event) },
+		},
+		{
+			name: "ExtractS3BucketName",
+			fn:   func() { ExtractS3BucketName(validS3Event) },
+		},
+		{
+			name: "ExtractS3ObjectKey",
+			fn:   func() { ExtractS3ObjectKey(validS3Event) },
+		},
+		{
+			name: "ValidateEventStructure_LargeS3Event",
+			fn:   func() { ValidateEventStructure(largeS3Event, "s3") },
+		},
+		{
+			name: "ParseS3Event_Large",
+			fn:   func() { ParseS3Event(largeS3Event) },
+		},
+	}
+	
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				bm.fn()
+			}
+		})
+	}
+}
+
+// Memory allocation tests
+
+func TestEventUtilities_MemoryEfficiency_TDD(t *testing.T) {
+	t.Run("ParseS3Event_ShouldReuseStructures", func(t *testing.T) {
+		event := BuildS3Event("bucket", "key", "")
+		
+		// Multiple parsing operations should not cause excessive allocations
+		for i := 0; i < 10; i++ {
+			parsedEvent, err := ParseS3EventE(event)
+			require.NoError(t, parseErr)
+			assert.Len(t, parsedEvent.Records, 1)
+		}
+	})
+	
+	t.Run("ValidateEventStructure_ShouldNotLeakMemory", func(t *testing.T) {
+		event := BuildS3Event("bucket", "key", "")
+		
+		// Multiple validation operations
+		for i := 0; i < 100; i++ {
+			errors := ValidateEventStructure(event, "s3")
+			assert.Empty(t, errors)
+		}
+	})
+}
+
+// Integration tests combining multiple utilities
+
+func TestEventUtilities_IntegrationScenarios_TDD(t *testing.T) {
+	t.Run("CompleteS3EventProcessingWorkflow", func(t *testing.T) {
+		// 1. Build an event
+		event := BuildS3Event("processing-bucket", "input/data.json", "s3:ObjectCreated:Put")
+		
+		// 2. Validate the event
+		errors := ValidateEventStructure(event, "s3")
+		require.Empty(t, errors, "Event should be valid")
+		
+		// 3. Parse the event to verify it's valid
+		_, parseErr := ParseS3EventE(event)
+		require.NoError(t, parseErr)
+		
+		// 4. Extract information
+		bucketName, err := ExtractS3BucketNameE(event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "processing-bucket", bucketName)
+		
+		objectKey, err := ExtractS3ObjectKeyE(event)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "input/data.json", objectKey)
+		
+		// 5. Add more events to simulate batch processing
+		event = AddS3EventRecord(event, "processing-bucket", "input/data2.json", "s3:ObjectCreated:Put")
+		event = AddS3EventRecord(event, "processing-bucket", "input/data3.json", "s3:ObjectCreated:Put")
+		
+		// 6. Validate the combined event
+		errors = ValidateEventStructure(event, "s3")
+		assert.Empty(t, errors, "Combined event should still be valid")
+		
+		// 7. Parse the combined event
+		finalEvent, err := ParseS3EventE(event)
+		require.NoError(t, parseErr)
+		assert.Len(t, finalEvent.Records, 3)
+		
+		// 8. Verify all records are properly structured
+		for i, record := range finalEvent.Records {
+			assert.Equal(t, "processing-bucket", record.S3.Bucket.Name)
+			assert.Equal(t, fmt.Sprintf("input/data%s.json", map[int]string{0: "", 1: "2", 2: "3"}[i]), record.S3.Object.Key)
+			assert.Equal(t, "s3:ObjectCreated:Put", record.EventName)
+		}
+	})
+	
+	t.Run("ErrorRecoveryWorkflow", func(t *testing.T) {
+		// Test that utilities handle errors gracefully and provide useful information
+		
+		// 1. Try to parse invalid JSON
+		_, err := ParseS3EventE(`{"invalid": json}`)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse S3 event")
+		
+		// 2. Try to extract from event with no records
+		_, err = ExtractS3BucketNameE(`{"Records": []}`)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no S3 records found")
+		
+		// 3. Validate structure of malformed event
+		errors := ValidateEventStructure(`{"Records": [{"eventSource": "wrong"}]}`, "s3")
+		assert.NotEmpty(t, errors)
+		assert.Contains(t, errors[0], "wrong event source")
+		
+		// 4. Try to add record to invalid base event
+		_, err = AddS3EventRecordE(`{"invalid": json}`, "bucket", "key", "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal existing S3 event")
+	})
+}

@@ -16,8 +16,8 @@ import (
 
 // TestContext represents a serverless test context integrated with vasdeference
 type TestContext struct {
-    *sfx.TestContext
-    arrange   *sfx.Arrange
+    *vasdeference.TestContext
+    arrange   *vasdeference.Arrange
     namespace string
     locks     map[string]*sync.Mutex
     lockMutex sync.Mutex
@@ -25,14 +25,15 @@ type TestContext struct {
 
 // Runner manages parallel test execution with resource isolation
 type Runner struct {
-    t             sfx.TestingT
+    t             vasdeference.TestingT
     pool          *ants.Pool
-    baseArrange   *sfx.Arrange
+    baseArrange   *vasdeference.Arrange
     resourceLocks sync.Map
     testCounter   int64
     errors        []error
     errorMutex    sync.Mutex
     wg            sync.WaitGroup
+	testTimeout   time.Duration
 }
 
 // Options configures the parallel runner
@@ -47,11 +48,11 @@ type Options struct {
     TestTimeout time.Duration
 
     // BaseArrange provides the base arrange for creating isolated test contexts
-    BaseArrange *sfx.Arrange
+    BaseArrange *vasdeference.Arrange
 }
 
 // NewRunner creates a new parallel test runner
-func NewRunner(t sfx.TestingT, opts Options) (*Runner, error) {
+func NewRunner(t vasdeference.TestingT, opts Options) (*Runner, error) {
     if opts.PoolSize <= 0 {
         opts.PoolSize = 4
     }
@@ -73,6 +74,7 @@ func NewRunner(t sfx.TestingT, opts Options) (*Runner, error) {
         t:           t,
         pool:        pool,
         baseArrange: opts.BaseArrange,
+		testTimeout: opts.TestTimeout,
     }
 
     // Register cleanup if testing.TB is available
@@ -135,15 +137,15 @@ func (r *Runner) runTestCase(tc TestCase) {
     
     // Create isolated test context and arrange
     var testCtx *TestContext
-    var arrange *sfx.Arrange
+    var arrange *vasdeference.Arrange
     
     if r.baseArrange != nil {
         // Create isolated arrange with unique namespace
-        arrange = sfx.NewArrangeWithNamespace(r.baseArrange.Context, namespace)
+        arrange = vasdeference.NewArrangeWithNamespace(r.baseArrange.Context, namespace)
     } else {
         // Create minimal test context and arrange
-        baseTestCtx := sfx.NewTestContext(r.t)
-        arrange = sfx.NewArrangeWithNamespace(baseTestCtx, namespace)
+        baseTestCtx := vasdeference.NewTestContext(r.t)
+        arrange = vasdeference.NewArrangeWithNamespace(baseTestCtx, namespace)
     }
     
     testCtx = &TestContext{
@@ -157,7 +159,7 @@ func (r *Runner) runTestCase(tc TestCase) {
     defer arrange.Cleanup()
 
     // Create context with timeout
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+    ctx, cancel := context.WithTimeout(context.Background(), r.testTimeout)
     defer cancel()
 
     // Run test with panic recovery
@@ -373,7 +375,7 @@ func convertToTestCases(t *testing.T, cases interface{}, testFunc interface{}) [
 }
 
 // NewRunnerE creates a new parallel test runner with error return (Terratest pattern)
-func NewRunnerE(t sfx.TestingT, opts Options) (*Runner, error) {
+func NewRunnerE(t vasdeference.TestingT, opts Options) (*Runner, error) {
     return NewRunner(t, opts)
 }
 
@@ -408,12 +410,12 @@ func (r *Runner) RunE(testCases []TestCase) error {
 // AWS service-specific test runners with vasdeference integration
 
 // NewRunnerWithArrange creates a runner with an existing arrange context
-func NewRunnerWithArrange(arrange *sfx.Arrange, opts Options) (*Runner, error) {
+func NewRunnerWithArrange(arrange *vasdeference.Arrange, opts Options) (*Runner, error) {
     opts.BaseArrange = arrange
     return NewRunner(arrange.Context.T, opts)
 }
 
 // NewRunnerWithArrangeE creates a runner with an existing arrange context, returning error
-func NewRunnerWithArrangeE(arrange *sfx.Arrange, opts Options) (*Runner, error) {
+func NewRunnerWithArrangeE(arrange *vasdeference.Arrange, opts Options) (*Runner, error) {
     return NewRunnerWithArrange(arrange, opts)
 }

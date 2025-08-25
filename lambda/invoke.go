@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"github.com/gruntwork-io/terratest/modules/retry"
 )
 
 // Invoke synchronously invokes a Lambda function with the given payload.
@@ -71,8 +72,8 @@ func InvokeWithOptionsE(ctx *TestContext, functionName string, payload string, o
 	// Create Lambda client
 	client := createLambdaClient(ctx)
 	
-	// Execute invocation with retry logic
-	result, err := executeInvokeWithRetry(client, functionName, payload, options)
+	// Execute invocation with Terratest retry logic
+	result, err := executeInvokeWithTerratestRetry(ctx, client, functionName, payload, options)
 	
 	duration := time.Since(startTime)
 	logResult("invoke", functionName, err == nil, duration, err)
@@ -146,42 +147,37 @@ func DryRunInvokeE(ctx *TestContext, functionName string, payload string) (*Invo
 	return InvokeWithOptionsE(ctx, functionName, payload, opts)
 }
 
-// executeInvokeWithRetry handles the actual invocation with retry logic
-func executeInvokeWithRetry(client *lambda.Client, functionName string, payload string, opts InvokeOptions) (*InvokeResult, error) {
-	retryConfig := defaultRetryConfig()
-	retryConfig.MaxAttempts = opts.MaxRetries
-	retryConfig.BaseDelay = opts.RetryDelay
+// executeInvokeWithTerratestRetry handles the actual invocation using Terratest retry patterns
+func executeInvokeWithTerratestRetry(ctx *TestContext, client LambdaClientInterface, functionName string, payload string, opts InvokeOptions) (*InvokeResult, error) {
+	var result *InvokeResult
 	
-	var lastErr error
+	description := fmt.Sprintf("Invoke Lambda function %s", functionName)
 	
-	for attempt := 1; attempt <= retryConfig.MaxAttempts; attempt++ {
-		result, err := executeInvoke(client, functionName, payload, opts)
-		if err == nil {
-			return result, nil
-		}
-		
-		lastErr = err
-		
-		// Don't retry for certain errors
-		if isNonRetryableError(err) {
-			return nil, err
-		}
-		
-		// If this was the last attempt, return the error
-		if attempt == retryConfig.MaxAttempts {
-			break
-		}
-		
-		// Wait before retrying with exponential backoff
-		delay := calculateBackoffDelay(attempt, retryConfig)
-		time.Sleep(delay)
-	}
+	// Use Terratest's DoWithRetry for consistent retry behavior
+	retry.DoWithRetry(
+		ctx.T,
+		description,
+		opts.MaxRetries,
+		opts.RetryDelay,
+		func() (string, error) {
+			r, err := executeInvoke(client, functionName, payload, opts)
+			if err != nil {
+				// Don't retry for certain errors
+				if isNonRetryableError(err) {
+					return "", retry.FatalError{Underlying: err}
+				}
+				return "", err
+			}
+			result = r
+			return "success", nil
+		},
+	)
 	
-	return nil, lastErr
+	return result, nil
 }
 
 // executeInvoke performs the actual Lambda invocation
-func executeInvoke(client *lambda.Client, functionName string, payload string, opts InvokeOptions) (*InvokeResult, error) {
+func executeInvoke(client LambdaClientInterface, functionName string, payload string, opts InvokeOptions) (*InvokeResult, error) {
 	// Create invocation context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), opts.Timeout)
 	defer cancel()
