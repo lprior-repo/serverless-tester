@@ -141,7 +141,7 @@ func TestAssertStateMachineExistsE_Internal(t *testing.T) {
 	}
 }
 
-func TestAssertStateMachineStatus(t *testing.T) {
+func TestStateMachineAssertStateMachineStatus(t *testing.T) {
 	tests := []struct {
 		name             string
 		ctx              *TestContext
@@ -268,7 +268,7 @@ func TestAssertStateMachineStatusE_Internal(t *testing.T) {
 	}
 }
 
-func TestAssertStateMachineType(t *testing.T) {
+func TestStateMachineAssertStateMachineType(t *testing.T) {
 	tests := []struct {
 		name             string
 		ctx              *TestContext
@@ -395,7 +395,7 @@ func TestAssertStateMachineTypeE_Internal(t *testing.T) {
 	}
 }
 
-func TestAssertExecutionCount(t *testing.T) {
+func TestStateMachineAssertExecutionCount(t *testing.T) {
 	tests := []struct {
 		name             string
 		ctx              *TestContext
@@ -522,7 +522,7 @@ func TestAssertExecutionCountE_Internal(t *testing.T) {
 	}
 }
 
-func TestAssertExecutionCountByStatus(t *testing.T) {
+func TestStateMachineAssertExecutionCountByStatus(t *testing.T) {
 	tests := []struct {
 		name             string
 		ctx              *TestContext

@@ -14,6 +14,11 @@
             "date": 1756012264322,
             "name": "/home/family/sfx/logs/mcp-puppeteer-2025-08-24.log",
             "hash": "134ac3ce75f0ab612f32280caa5fffbe76330dfcc00c1533f7d4dad618d2e3a3"
+        },
+        {
+            "date": 1756125302918,
+            "name": "/home/family/sfx/logs/mcp-puppeteer-2025-08-25.log",
+            "hash": "b154cbe6fb5639f90f444908d9de840481dac90ec8dac689f50056322adc83f7"
         }
     ],
     "hashType": "sha256"

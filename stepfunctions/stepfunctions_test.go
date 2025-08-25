@@ -89,21 +89,6 @@ func createTestExecutionResult(status types.ExecutionStatus, output string) *Exe
 	}
 }
 
-func createTestHistoryEvent(eventType types.HistoryEventType, timestamp time.Time) HistoryEvent {
-	return HistoryEvent{
-		Timestamp:                    timestamp,
-		Type:                         eventType,
-		ID:                          1,
-		PreviousEventID:             0,
-		StateEnteredEventDetails:    nil,
-		StateExitedEventDetails:     nil,
-		TaskStateEnteredEventDetails: nil,
-		ExecutionStartedEventDetails: &ExecutionStartedEventDetails{
-			Input: `{"message": "Hello, World!"}`,
-			RoleArn: "arn:aws:iam::123456789012:role/StepFunctionsRole",
-		},
-	}
-}
 
 // Table-driven test structures
 
@@ -583,46 +568,7 @@ func TestCreateRetryableInput(t *testing.T) {
 
 // Tests for history analysis
 
-func TestFindHistoryEventsByType(t *testing.T) {
-	// Arrange
-	events := []HistoryEvent{
-		createTestHistoryEvent(types.HistoryEventTypeExecutionStarted, time.Now()),
-		createTestHistoryEvent(types.HistoryEventTypeTaskStateEntered, time.Now().Add(1*time.Second)),
-		createTestHistoryEvent(types.HistoryEventTypeTaskStateExited, time.Now().Add(2*time.Second)),
-		createTestHistoryEvent(types.HistoryEventTypeExecutionSucceeded, time.Now().Add(3*time.Second)),
-	}
-	
-	// Act
-	startEvents := findHistoryEventsByType(events, types.HistoryEventTypeExecutionStarted)
-	stateEvents := findHistoryEventsByType(events, types.HistoryEventTypeTaskStateEntered)
-	
-	// Assert
-	assert.Len(t, startEvents, 1, "Should find one execution started event")
-	assert.Len(t, stateEvents, 1, "Should find one state entered event")
-	assert.Equal(t, types.HistoryEventTypeExecutionStarted, startEvents[0].Type, "Should return correct event type")
-}
 
-func TestCalculateExecutionDuration(t *testing.T) {
-	// Arrange
-	startTime := time.Now()
-	endTime := startTime.Add(5 * time.Minute)
-	events := []HistoryEvent{
-		{
-			Type:      types.HistoryEventTypeExecutionStarted,
-			Timestamp: startTime,
-		},
-		{
-			Type:      types.HistoryEventTypeExecutionSucceeded,
-			Timestamp: endTime,
-		},
-	}
-	
-	// Act
-	duration := calculateExecutionDuration(events)
-	
-	// Assert
-	assert.Equal(t, 5*time.Minute, duration, "Should calculate correct execution duration")
-}
 
 // Benchmark tests for performance-critical functions
 

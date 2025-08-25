@@ -133,13 +133,13 @@ func AssertEnvVarDoesNotExist(ctx *TestContext, functionName string, varName str
 // AssertInvokeSuccess asserts that a Lambda invocation was successful.
 func AssertInvokeSuccess(ctx *TestContext, result *InvokeResult) {
 	if result == nil {
-		ctx.T.Errorf("Expected invocation result to be non-nil")
+		ctx.T.Errorf("InvokeResult cannot be nil")
 		ctx.T.FailNow()
 		return
 	}
 	
 	if result.FunctionError != "" {
-		ctx.T.Errorf("Expected successful invocation, but got function error: %s", result.FunctionError)
+		ctx.T.Errorf("Expected Lambda invocation to succeed, but got function error: %s", result.FunctionError)
 		ctx.T.FailNow()
 		return
 	}
@@ -154,13 +154,13 @@ func AssertInvokeSuccess(ctx *TestContext, result *InvokeResult) {
 // AssertInvokeError asserts that a Lambda invocation resulted in an error.
 func AssertInvokeError(ctx *TestContext, result *InvokeResult) {
 	if result == nil {
-		ctx.T.Errorf("Expected invocation result to be non-nil")
+		ctx.T.Errorf("InvokeResult cannot be nil")
 		ctx.T.FailNow()
 		return
 	}
 	
 	if result.FunctionError == "" {
-		ctx.T.Errorf("Expected invocation to result in function error, but got none")
+		ctx.T.Errorf("Expected Lambda invocation to fail, but got none")
 		ctx.T.FailNow()
 		return
 	}
@@ -169,7 +169,7 @@ func AssertInvokeError(ctx *TestContext, result *InvokeResult) {
 // AssertPayloadContains asserts that the invocation payload contains the expected text.
 func AssertPayloadContains(ctx *TestContext, result *InvokeResult, expectedText string) {
 	if result == nil {
-		ctx.T.Errorf("Expected invocation result to be non-nil")
+		ctx.T.Errorf("InvokeResult cannot be nil")
 		ctx.T.FailNow()
 		return
 	}
@@ -185,13 +185,13 @@ func AssertPayloadContains(ctx *TestContext, result *InvokeResult, expectedText 
 // AssertPayloadEquals asserts that the invocation payload equals the expected value.
 func AssertPayloadEquals(ctx *TestContext, result *InvokeResult, expectedPayload string) {
 	if result == nil {
-		ctx.T.Errorf("Expected invocation result to be non-nil")
+		ctx.T.Errorf("InvokeResult cannot be nil")
 		ctx.T.FailNow()
 		return
 	}
 	
 	if result.Payload != expectedPayload {
-		ctx.T.Errorf("Expected payload to be '%s', but got '%s'", 
+		ctx.T.Errorf("Expected payload to equal '%s', but got '%s'", 
 			expectedPayload, result.Payload)
 		ctx.T.FailNow()
 		return
@@ -201,7 +201,7 @@ func AssertPayloadEquals(ctx *TestContext, result *InvokeResult, expectedPayload
 // AssertExecutionTimeLessThan asserts that the Lambda execution time is less than the expected duration.
 func AssertExecutionTimeLessThan(ctx *TestContext, result *InvokeResult, maxDuration time.Duration) {
 	if result == nil {
-		ctx.T.Errorf("Expected invocation result to be non-nil")
+		ctx.T.Errorf("InvokeResult cannot be nil")
 		ctx.T.FailNow()
 		return
 	}
@@ -385,4 +385,188 @@ func ValidateLogEntries(logs []LogEntry, expectedCount int, expectedContains str
 	}
 	
 	return errors
+}
+
+// Event Source Mapping Assertions
+
+// AssertEventSourceMappingExists asserts that an event source mapping exists.
+func AssertEventSourceMappingExists(ctx *TestContext, uuid string) {
+	exists, err := EventSourceMappingExistsE(ctx, uuid)
+	if err != nil {
+		ctx.T.Errorf("Failed to check if event source mapping exists: %v", err)
+		ctx.T.FailNow()
+	}
+	
+	if !exists {
+		ctx.T.Errorf("Expected event source mapping '%s' to exist, but it does not", uuid)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertEventSourceMappingDoesNotExist asserts that an event source mapping does not exist.
+func AssertEventSourceMappingDoesNotExist(ctx *TestContext, uuid string) {
+	exists, err := EventSourceMappingExistsE(ctx, uuid)
+	if err != nil {
+		// If we get an error other than "not found", that's a problem
+		if !strings.Contains(err.Error(), "ResourceNotFoundException") &&
+		   !strings.Contains(err.Error(), "does not exist") {
+			ctx.T.Errorf("Failed to check if event source mapping exists: %v", err)
+			ctx.T.FailNow()
+		}
+		// If we get a "not found" error, that's what we expect
+		return
+	}
+	
+	if exists {
+		ctx.T.Errorf("Expected event source mapping '%s' not to exist, but it does", uuid)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertEventSourceMappingEnabled asserts that an event source mapping is enabled.
+func AssertEventSourceMappingEnabled(ctx *TestContext, uuid string) {
+	mapping := GetEventSourceMapping(ctx, uuid)
+	
+	if mapping.State != "Enabled" {
+		ctx.T.Errorf("Expected event source mapping '%s' to be enabled, but got state '%s'", uuid, mapping.State)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertEventSourceMappingDisabled asserts that an event source mapping is disabled.
+func AssertEventSourceMappingDisabled(ctx *TestContext, uuid string) {
+	mapping := GetEventSourceMapping(ctx, uuid)
+	
+	if mapping.State != "Disabled" {
+		ctx.T.Errorf("Expected event source mapping '%s' to be disabled, but got state '%s'", uuid, mapping.State)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertEventSourceMappingBatchSize asserts that an event source mapping has the expected batch size.
+func AssertEventSourceMappingBatchSize(ctx *TestContext, uuid string, expectedBatchSize int32) {
+	mapping := GetEventSourceMapping(ctx, uuid)
+	
+	if mapping.BatchSize != expectedBatchSize {
+		ctx.T.Errorf("Expected event source mapping '%s' to have batch size %d, but got %d", 
+			uuid, expectedBatchSize, mapping.BatchSize)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertEventSourceMappingStartingPosition asserts that an event source mapping has the expected starting position.
+func AssertEventSourceMappingStartingPosition(ctx *TestContext, uuid string, expectedPosition types.EventSourcePosition) {
+	mapping := GetEventSourceMapping(ctx, uuid)
+	
+	if mapping.StartingPosition != expectedPosition {
+		ctx.T.Errorf("Expected event source mapping '%s' to have starting position '%s', but got '%s'", 
+			uuid, string(expectedPosition), string(mapping.StartingPosition))
+		ctx.T.FailNow()
+	}
+}
+
+// AssertEventSourceMappingFunctionName asserts that an event source mapping is associated with the expected function.
+func AssertEventSourceMappingFunctionName(ctx *TestContext, uuid string, expectedFunctionName string) {
+	mapping := GetEventSourceMapping(ctx, uuid)
+	
+	if mapping.FunctionName != expectedFunctionName {
+		ctx.T.Errorf("Expected event source mapping '%s' to be associated with function '%s', but got '%s'", 
+			uuid, expectedFunctionName, mapping.FunctionName)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertEventSourceMappingEventSourceArn asserts that an event source mapping has the expected event source ARN.
+func AssertEventSourceMappingEventSourceArn(ctx *TestContext, uuid string, expectedArn string) {
+	mapping := GetEventSourceMapping(ctx, uuid)
+	
+	if mapping.EventSourceArn != expectedArn {
+		ctx.T.Errorf("Expected event source mapping '%s' to have event source ARN '%s', but got '%s'", 
+			uuid, expectedArn, mapping.EventSourceArn)
+		ctx.T.FailNow()
+	}
+}
+
+// Advanced CloudWatch Logs Assertions
+
+// AssertLogGroupExists asserts that a CloudWatch log group exists for the function.
+func AssertLogGroupExists(ctx *TestContext, functionName string) {
+	exists, err := LogGroupExistsE(ctx, functionName)
+	if err != nil {
+		ctx.T.Errorf("Failed to check if log group exists: %v", err)
+		ctx.T.FailNow()
+	}
+	
+	if !exists {
+		ctx.T.Errorf("Expected log group for function '%s' to exist, but it does not", functionName)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertLogGroupDoesNotExist asserts that a CloudWatch log group does not exist for the function.
+func AssertLogGroupDoesNotExist(ctx *TestContext, functionName string) {
+	exists, err := LogGroupExistsE(ctx, functionName)
+	if err != nil {
+		// If we get an error other than "not found", that's a problem
+		if !strings.Contains(err.Error(), "ResourceNotFoundException") &&
+		   !strings.Contains(err.Error(), "does not exist") {
+			ctx.T.Errorf("Failed to check if log group exists: %v", err)
+			ctx.T.FailNow()
+		}
+		// If we get a "not found" error, that's what we expect
+		return
+	}
+	
+	if exists {
+		ctx.T.Errorf("Expected log group for function '%s' not to exist, but it does", functionName)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertRecentLogsCount asserts that the function has the expected number of recent log entries.
+func AssertRecentLogsCount(ctx *TestContext, functionName string, expectedCount int, duration time.Duration) {
+	logs := GetRecentLogs(ctx, functionName, duration)
+	
+	actualCount := len(logs)
+	if actualCount != expectedCount {
+		ctx.T.Errorf("Expected function '%s' to have %d recent log entries (within %v), but got %d", 
+			functionName, expectedCount, duration, actualCount)
+		ctx.T.FailNow()
+	}
+}
+
+// AssertLogEntryTimestamp asserts that log entries are within the expected time range.
+func AssertLogEntryTimestamp(ctx *TestContext, functionName string, maxAge time.Duration) {
+	logs := GetRecentLogs(ctx, functionName, maxAge*2) // Get twice the max age to ensure we have logs to check
+	
+	if len(logs) == 0 {
+		ctx.T.Errorf("Expected function '%s' to have log entries to check timestamps, but got none", functionName)
+		ctx.T.FailNow()
+		return
+	}
+	
+	now := time.Now()
+	for _, log := range logs {
+		age := now.Sub(log.Timestamp)
+		if age > maxAge {
+			ctx.T.Errorf("Expected log entry for function '%s' to be within %v, but found entry %v old", 
+				functionName, maxAge, age)
+			ctx.T.FailNow()
+			return
+		}
+	}
+}
+
+// AssertLogStreamExists asserts that a CloudWatch log stream exists for the function.
+func AssertLogStreamExists(ctx *TestContext, functionName string, logStreamName string) {
+	exists, err := LogStreamExistsE(ctx, functionName, logStreamName)
+	if err != nil {
+		ctx.T.Errorf("Failed to check if log stream exists: %v", err)
+		ctx.T.FailNow()
+	}
+	
+	if !exists {
+		ctx.T.Errorf("Expected log stream '%s' for function '%s' to exist, but it does not", logStreamName, functionName)
+		ctx.T.FailNow()
+	}
 }

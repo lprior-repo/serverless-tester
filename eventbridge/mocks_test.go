@@ -236,20 +236,27 @@ func (m *MockEventBridgeClient) AnyTime() interface{} {
 // MockTestingT provides a mock implementation of TestingT interface for testing
 type MockTestingT struct {
 	mock.Mock
+	ErrorfCalled  bool
+	FailNowCalled bool
+	ErrorCalled   bool
+	FatalCalled   bool
 }
 
 // Errorf mocks the Errorf method
 func (m *MockTestingT) Errorf(format string, args ...interface{}) {
+	m.ErrorfCalled = true
 	m.Called(format, args)
 }
 
 // FailNow mocks the FailNow method
 func (m *MockTestingT) FailNow() {
+	m.FailNowCalled = true
 	m.Called()
 }
 
 // Error mocks the Error method
 func (m *MockTestingT) Error(args ...interface{}) {
+	m.ErrorCalled = true
 	m.Called(args)
 }
 
@@ -265,11 +272,13 @@ func (m *MockTestingT) Helper() {
 
 // Fatal mocks the Fatal method
 func (m *MockTestingT) Fatal(args ...interface{}) {
+	m.FatalCalled = true
 	m.Called(args)
 }
 
 // Fatalf mocks the Fatalf method
 func (m *MockTestingT) Fatalf(format string, args ...interface{}) {
+	m.FatalCalled = true
 	m.Called(format, args)
 }
 

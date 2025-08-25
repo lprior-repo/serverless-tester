@@ -31,6 +31,11 @@ type MockSFNClientInterface struct {
 	mock.Mock
 }
 
+// MockStepFunctionsClient provides mock functions for testing
+type MockStepFunctionsClient struct {
+	GetExecutionHistoryFunc func(ctx context.Context, input *sfn.GetExecutionHistoryInput) (*sfn.GetExecutionHistoryOutput, error)
+}
+
 func (m *MockSFNClientInterface) CreateStateMachine(ctx context.Context, input *sfn.CreateStateMachineInput, opts ...func(*sfn.Options)) (*sfn.CreateStateMachineOutput, error) {
 	args := m.Called(ctx, input)
 	if args.Get(0) == nil {

@@ -202,8 +202,8 @@ func TestCreateWorkflowInputWithNilParameters(t *testing.T) {
 	assert.False(t, hasRequestId, "RequestId should not be set")
 }
 
-// TestFindFailedSteps tests finding failed steps from history
-func TestFindFailedSteps(t *testing.T) {
+// TestUtilityFindFailedSteps tests finding failed steps from history
+func TestUtilityFindFailedSteps(t *testing.T) {
 	tests := []struct {
 		name        string
 		events      []HistoryEvent
@@ -287,8 +287,8 @@ func TestFindFailedSteps(t *testing.T) {
 	}
 }
 
-// TestGetRetryAttempts tests counting retry attempts from history
-func TestGetRetryAttempts(t *testing.T) {
+// TestUtilityGetRetryAttempts tests counting retry attempts from history
+func TestUtilityGetRetryAttempts(t *testing.T) {
 	tests := []struct {
 		name        string
 		events      []HistoryEvent

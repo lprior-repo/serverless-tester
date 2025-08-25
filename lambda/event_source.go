@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 )
@@ -346,6 +347,7 @@ type EventSourceMappingResult struct {
 	UUID                             string
 	EventSourceArn                   string
 	FunctionArn                      string
+	FunctionName                     string
 	LastModified                     time.Time
 	LastProcessingResult             string
 	State                            string
@@ -884,4 +886,76 @@ func convertToEventSourceMappingResult(awsMapping interface{}) *EventSourceMappi
 	}
 	
 	return result
+}
+
+// EventSourceMappingExistsE checks if an event source mapping exists by UUID.
+func EventSourceMappingExistsE(ctx *TestContext, uuid string) (bool, error) {
+	_, err := GetEventSourceMappingE(ctx, uuid)
+	if err != nil {
+		// Check if the error is "not found"
+		if strings.Contains(err.Error(), "ResourceNotFoundException") ||
+		   strings.Contains(err.Error(), "does not exist") {
+			return false, nil
+		}
+		// Other errors should be propagated
+		return false, err
+	}
+	return true, nil
+}
+
+// LogGroupExistsE checks if a CloudWatch log group exists for the function.
+func LogGroupExistsE(ctx *TestContext, functionName string) (bool, error) {
+	logGroupName := fmt.Sprintf("/aws/lambda/%s", functionName)
+	client := createCloudWatchLogsClient(ctx)
+	
+	input := &cloudwatchlogs.DescribeLogGroupsInput{
+		LogGroupNamePrefix: aws.String(logGroupName),
+		Limit:              aws.Int32(1),
+	}
+	
+	output, err := client.DescribeLogGroups(context.Background(), input)
+	if err != nil {
+		if strings.Contains(err.Error(), "ResourceNotFoundException") {
+			return false, nil
+		}
+		return false, err
+	}
+	
+	// Check if we found the exact log group
+	for _, logGroup := range output.LogGroups {
+		if aws.ToString(logGroup.LogGroupName) == logGroupName {
+			return true, nil
+		}
+	}
+	
+	return false, nil
+}
+
+// LogStreamExistsE checks if a CloudWatch log stream exists for the function.
+func LogStreamExistsE(ctx *TestContext, functionName string, logStreamName string) (bool, error) {
+	logGroupName := fmt.Sprintf("/aws/lambda/%s", functionName)
+	client := createCloudWatchLogsClient(ctx)
+	
+	input := &cloudwatchlogs.DescribeLogStreamsInput{
+		LogGroupName:        aws.String(logGroupName),
+		LogStreamNamePrefix: aws.String(logStreamName),
+		Limit:               aws.Int32(1),
+	}
+	
+	output, err := client.DescribeLogStreams(context.Background(), input)
+	if err != nil {
+		if strings.Contains(err.Error(), "ResourceNotFoundException") {
+			return false, nil
+		}
+		return false, err
+	}
+	
+	// Check if we found the exact log stream
+	for _, logStream := range output.LogStreams {
+		if aws.ToString(logStream.LogStreamName) == logStreamName {
+			return true, nil
+		}
+	}
+	
+	return false, nil
 }

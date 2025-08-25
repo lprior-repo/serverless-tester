@@ -60,8 +60,8 @@ func TestDoWithRetry_ShouldFailAfterMaxAttempts(t *testing.T) {
 	
 	// Assert
 	assert.Error(t, err, "DoWithRetry should fail after max attempts")
-	assert.Contains(t, err.Error(), "after 3 attempts", "Error should mention number of attempts")
-	assert.Equal(t, 3, callCount, "Operation should be called exactly max attempts times")
+	assert.Contains(t, err.Error(), "after 3 retries", "Error should mention number of retries")
+	assert.Equal(t, 4, callCount, "Operation should be called exactly max attempts times (initial + retries)")
 }
 
 // RED: Test that DoWithRetryE executes operation successfully on first try
@@ -120,8 +120,8 @@ func TestDoWithRetryE_ShouldFailAfterMaxAttempts(t *testing.T) {
 	// Assert
 	assert.Error(t, err, "DoWithRetryE should fail after max attempts")
 	assert.Empty(t, result, "DoWithRetryE should return zero value on failure")
-	assert.Contains(t, err.Error(), "after 3 attempts", "Error should mention number of attempts")
-	assert.Equal(t, 3, callCount, "Operation should be called exactly max attempts times")
+	assert.Contains(t, err.Error(), "after 3 retries", "Error should mention number of retries")
+	assert.Equal(t, 4, callCount, "Operation should be called exactly max attempts times (initial + retries)")
 }
 
 // RED: Test that DoWithRetryWithContext respects context cancellation

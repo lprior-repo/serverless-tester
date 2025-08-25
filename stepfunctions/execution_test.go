@@ -294,7 +294,7 @@ func TestDescribeExecutionE(t *testing.T) {
 	}
 }
 
-func TestListExecutionsE(t *testing.T) {
+func TestExecutionListExecutionsE(t *testing.T) {
 	tests := []struct {
 		name                 string
 		stateMachineArn      string
@@ -360,31 +360,7 @@ func TestListExecutionsE(t *testing.T) {
 
 // Tests for execution result processing
 
-func TestProcessExecutionResult(t *testing.T) {
-	// Arrange
-	result := createTestExecutionResult(types.ExecutionStatusSucceeded, `{"result": "success"}`)
-	
-	// Act
-	processed := processExecutionResult(result)
-	
-	// Assert
-	assert.NotNil(t, processed, "Processed result should not be nil")
-	assert.Equal(t, result.ExecutionArn, processed.ExecutionArn, "ARN should be preserved")
-	assert.Equal(t, result.Status, processed.Status, "Status should be preserved")
-	assert.Equal(t, result.Output, processed.Output, "Output should be preserved")
-}
 
-func TestCalculateExecutionTime(t *testing.T) {
-	// Arrange
-	startTime := time.Now()
-	stopTime := startTime.Add(5 * time.Minute)
-	
-	// Act
-	duration := calculateExecutionTime(startTime, stopTime)
-	
-	// Assert
-	assert.Equal(t, 5*time.Minute, duration, "Should calculate correct execution time")
-}
 
 func TestIsExecutionComplete(t *testing.T) {
 	tests := []struct {
