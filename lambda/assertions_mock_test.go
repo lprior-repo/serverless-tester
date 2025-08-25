@@ -35,8 +35,8 @@ func teardownMockAssertionTest() {
 	SetClientFactory(&DefaultClientFactory{})
 }
 
-// RED: Test AssertFunctionExists with existing function using mocks
-func TestAssertFunctionExists_WithExistingFunction_UsingMocks_ShouldPass(t *testing.T) {
+// RED: Test AssertFunctionExists with existing function using mocks (Basic version)
+func TestAssertFunctionExists_WithExistingFunction_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with existing function
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -64,7 +64,7 @@ func TestAssertFunctionExists_WithExistingFunction_UsingMocks_ShouldPass(t *test
 }
 
 // RED: Test AssertFunctionExists with non-existing function using mocks  
-func TestAssertFunctionExists_WithNonExistingFunction_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertFunctionExists_WithNonExistingFunction_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with non-existing function
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -86,7 +86,7 @@ func TestAssertFunctionExists_WithNonExistingFunction_UsingMocks_ShouldFail(t *t
 }
 
 // RED: Test AssertFunctionExists with API error using mocks
-func TestAssertFunctionExists_WithAPIError_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertFunctionExists_WithAPIError_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with API error
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -109,7 +109,7 @@ func TestAssertFunctionExists_WithAPIError_UsingMocks_ShouldFail(t *testing.T) {
 }
 
 // RED: Test AssertFunctionDoesNotExist with non-existing function using mocks
-func TestAssertFunctionDoesNotExist_WithNonExistingFunction_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertFunctionDoesNotExist_WithNonExistingFunction_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with non-existing function
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -130,7 +130,7 @@ func TestAssertFunctionDoesNotExist_WithNonExistingFunction_UsingMocks_ShouldPas
 }
 
 // RED: Test AssertFunctionDoesNotExist with existing function using mocks
-func TestAssertFunctionDoesNotExist_WithExistingFunction_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertFunctionDoesNotExist_WithExistingFunction_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with existing function
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -157,7 +157,7 @@ func TestAssertFunctionDoesNotExist_WithExistingFunction_UsingMocks_ShouldFail(t
 }
 
 // RED: Test AssertFunctionRuntime with matching runtime using mocks
-func TestAssertFunctionRuntime_WithMatchingRuntime_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertFunctionRuntime_WithMatchingRuntime_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with function having expected runtime
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -183,7 +183,7 @@ func TestAssertFunctionRuntime_WithMatchingRuntime_UsingMocks_ShouldPass(t *test
 }
 
 // RED: Test AssertFunctionRuntime with different runtime using mocks
-func TestAssertFunctionRuntime_WithDifferentRuntime_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertFunctionRuntime_WithDifferentRuntime_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with function having different runtime
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -210,7 +210,7 @@ func TestAssertFunctionRuntime_WithDifferentRuntime_UsingMocks_ShouldFail(t *tes
 }
 
 // RED: Test AssertFunctionHandler with matching handler using mocks
-func TestAssertFunctionHandler_WithMatchingHandler_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertFunctionHandler_WithMatchingHandler_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with function having expected handler
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -236,7 +236,7 @@ func TestAssertFunctionHandler_WithMatchingHandler_UsingMocks_ShouldPass(t *test
 }
 
 // RED: Test AssertFunctionHandler with different handler using mocks
-func TestAssertFunctionHandler_WithDifferentHandler_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertFunctionHandler_WithDifferentHandler_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with function having different handler
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -263,7 +263,7 @@ func TestAssertFunctionHandler_WithDifferentHandler_UsingMocks_ShouldFail(t *tes
 }
 
 // RED: Test AssertFunctionTimeout with matching timeout using mocks
-func TestAssertFunctionTimeout_WithMatchingTimeout_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertFunctionTimeout_WithMatchingTimeout_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with function having expected timeout
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -289,7 +289,7 @@ func TestAssertFunctionTimeout_WithMatchingTimeout_UsingMocks_ShouldPass(t *test
 }
 
 // RED: Test AssertFunctionTimeout with different timeout using mocks
-func TestAssertFunctionTimeout_WithDifferentTimeout_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertFunctionTimeout_WithDifferentTimeout_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with function having different timeout
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -316,7 +316,7 @@ func TestAssertFunctionTimeout_WithDifferentTimeout_UsingMocks_ShouldFail(t *tes
 }
 
 // RED: Test AssertFunctionMemorySize with matching memory size using mocks
-func TestAssertFunctionMemorySize_WithMatchingMemorySize_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertFunctionMemorySize_WithMatchingMemorySize_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with function having expected memory size
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -342,7 +342,7 @@ func TestAssertFunctionMemorySize_WithMatchingMemorySize_UsingMocks_ShouldPass(t
 }
 
 // RED: Test AssertFunctionMemorySize with different memory size using mocks
-func TestAssertFunctionMemorySize_WithDifferentMemorySize_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertFunctionMemorySize_WithDifferentMemorySize_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with function having different memory size
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -369,7 +369,7 @@ func TestAssertFunctionMemorySize_WithDifferentMemorySize_UsingMocks_ShouldFail(
 }
 
 // RED: Test AssertFunctionState with matching state using mocks
-func TestAssertFunctionState_WithMatchingState_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertFunctionState_WithMatchingState_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with function in expected state
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -395,7 +395,7 @@ func TestAssertFunctionState_WithMatchingState_UsingMocks_ShouldPass(t *testing.
 }
 
 // RED: Test AssertFunctionState with different state using mocks
-func TestAssertFunctionState_WithDifferentState_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertFunctionState_WithDifferentState_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with function in different state
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -422,7 +422,7 @@ func TestAssertFunctionState_WithDifferentState_UsingMocks_ShouldFail(t *testing
 }
 
 // RED: Test AssertEnvVarEquals with matching environment variable using mocks
-func TestAssertEnvVarEquals_WithMatchingEnvVar_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertEnvVarEquals_WithMatchingEnvVar_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with function having expected environment variable
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -453,7 +453,7 @@ func TestAssertEnvVarEquals_WithMatchingEnvVar_UsingMocks_ShouldPass(t *testing.
 }
 
 // RED: Test AssertEnvVarEquals with different environment variable value using mocks
-func TestAssertEnvVarEquals_WithDifferentEnvVarValue_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertEnvVarEquals_WithDifferentEnvVarValue_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with function having different environment variable value
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -484,7 +484,7 @@ func TestAssertEnvVarEquals_WithDifferentEnvVarValue_UsingMocks_ShouldFail(t *te
 }
 
 // RED: Test AssertEnvVarExists with existing environment variable using mocks
-func TestAssertEnvVarExists_WithExistingEnvVar_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertEnvVarExists_WithExistingEnvVar_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with function having environment variable
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -514,7 +514,7 @@ func TestAssertEnvVarExists_WithExistingEnvVar_UsingMocks_ShouldPass(t *testing.
 }
 
 // RED: Test AssertEnvVarExists with missing environment variable using mocks
-func TestAssertEnvVarExists_WithMissingEnvVar_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertEnvVarExists_WithMissingEnvVar_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with function without the expected environment variable
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -545,7 +545,7 @@ func TestAssertEnvVarExists_WithMissingEnvVar_UsingMocks_ShouldFail(t *testing.T
 }
 
 // RED: Test AssertEnvVarDoesNotExist with non-existing environment variable using mocks
-func TestAssertEnvVarDoesNotExist_WithNonExistingEnvVar_UsingMocks_ShouldPass(t *testing.T) {
+func TestAssertEnvVarDoesNotExist_WithNonExistingEnvVar_UsingMocks_Basic_ShouldPass(t *testing.T) {
 	// Given: Mock setup with function without the environment variable
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()
@@ -575,7 +575,7 @@ func TestAssertEnvVarDoesNotExist_WithNonExistingEnvVar_UsingMocks_ShouldPass(t 
 }
 
 // RED: Test AssertEnvVarDoesNotExist with existing environment variable using mocks
-func TestAssertEnvVarDoesNotExist_WithExistingEnvVar_UsingMocks_ShouldFail(t *testing.T) {
+func TestAssertEnvVarDoesNotExist_WithExistingEnvVar_UsingMocks_Basic_ShouldFail(t *testing.T) {
 	// Given: Mock setup with function having the environment variable
 	ctx, mockClient, _ := setupMockAssertionTest()
 	defer teardownMockAssertionTest()

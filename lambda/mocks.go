@@ -37,6 +37,7 @@ type LambdaClientInterface interface {
 // CloudWatchLogsClientInterface defines the interface for CloudWatch Logs client operations
 type CloudWatchLogsClientInterface interface {
 	DescribeLogGroups(ctx context.Context, params *cloudwatchlogs.DescribeLogGroupsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error)
+	DescribeLogStreams(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error)
 	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
@@ -400,19 +401,27 @@ func (m *MockLambdaClient) Reset() {
 
 // MockCloudWatchLogsClient provides a mock implementation for testing
 type MockCloudWatchLogsClient struct {
-	DescribeLogGroupsResponse  *cloudwatchlogs.DescribeLogGroupsOutput
-	DescribeLogGroupsError     error
-	FilterLogEventsResponse    *cloudwatchlogs.FilterLogEventsOutput
-	FilterLogEventsError       error
+	DescribeLogGroupsResponse   *cloudwatchlogs.DescribeLogGroupsOutput
+	DescribeLogGroupsError      error
+	DescribeLogStreamsResponse  *cloudwatchlogs.DescribeLogStreamsOutput
+	DescribeLogStreamsError     error
+	FilterLogEventsResponse     *cloudwatchlogs.FilterLogEventsOutput
+	FilterLogEventsError        error
 	
 	// Call tracking for verification
-	DescribeLogGroupsCalls     int
-	FilterLogEventsCalls       []string
+	DescribeLogGroupsCalls      int
+	DescribeLogStreamsCalls     int
+	FilterLogEventsCalls        []string
 }
 
 func (m *MockCloudWatchLogsClient) DescribeLogGroups(ctx context.Context, params *cloudwatchlogs.DescribeLogGroupsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
 	m.DescribeLogGroupsCalls++
 	return m.DescribeLogGroupsResponse, m.DescribeLogGroupsError
+}
+
+func (m *MockCloudWatchLogsClient) DescribeLogStreams(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
+	m.DescribeLogStreamsCalls++
+	return m.DescribeLogStreamsResponse, m.DescribeLogStreamsError
 }
 
 func (m *MockCloudWatchLogsClient) FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
@@ -426,10 +435,13 @@ func (m *MockCloudWatchLogsClient) FilterLogEvents(ctx context.Context, params *
 func (m *MockCloudWatchLogsClient) Reset() {
 	m.DescribeLogGroupsResponse = nil
 	m.DescribeLogGroupsError = nil
+	m.DescribeLogStreamsResponse = nil
+	m.DescribeLogStreamsError = nil
 	m.FilterLogEventsResponse = nil
 	m.FilterLogEventsError = nil
 	
 	m.DescribeLogGroupsCalls = 0
+	m.DescribeLogStreamsCalls = 0
 	m.FilterLogEventsCalls = nil
 }
 

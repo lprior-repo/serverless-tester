@@ -165,9 +165,12 @@ func GetAWSResourceName(arn string) string {
 		return ""
 	}
 	
-	// For Lambda functions, the resource name is in parts[6]
+	// For Lambda functions, the resource name is in parts[6], optionally with version in parts[7]
 	if len(parts) >= 7 && parts[2] == "lambda" {
-		return parts[6] // function name
+		if len(parts) >= 8 {
+			return parts[6] + ":" + parts[7] // function name with version
+		}
+		return parts[6] // function name without version
 	}
 	
 	resource := parts[5]

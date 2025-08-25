@@ -47,6 +47,9 @@ func AssertFunctionDoesNotExist(ctx *TestContext, functionName string) {
 // AssertFunctionRuntime asserts that a Lambda function has the expected runtime.
 func AssertFunctionRuntime(ctx *TestContext, functionName string, expectedRuntime types.Runtime) {
 	config := GetFunction(ctx, functionName)
+	if config == nil {
+		return // GetFunction already called FailNow
+	}
 	
 	if config.Runtime != expectedRuntime {
 		ctx.T.Errorf("Expected function '%s' to have runtime '%s', but got '%s'", 
@@ -58,6 +61,9 @@ func AssertFunctionRuntime(ctx *TestContext, functionName string, expectedRuntim
 // AssertFunctionHandler asserts that a Lambda function has the expected handler.
 func AssertFunctionHandler(ctx *TestContext, functionName string, expectedHandler string) {
 	config := GetFunction(ctx, functionName)
+	if config == nil {
+		return // GetFunction already called FailNow
+	}
 	
 	if config.Handler != expectedHandler {
 		ctx.T.Errorf("Expected function '%s' to have handler '%s', but got '%s'", 
@@ -69,6 +75,9 @@ func AssertFunctionHandler(ctx *TestContext, functionName string, expectedHandle
 // AssertFunctionTimeout asserts that a Lambda function has the expected timeout.
 func AssertFunctionTimeout(ctx *TestContext, functionName string, expectedTimeout int32) {
 	config := GetFunction(ctx, functionName)
+	if config == nil {
+		return // GetFunction already called FailNow
+	}
 	
 	if config.Timeout != expectedTimeout {
 		ctx.T.Errorf("Expected function '%s' to have timeout %d seconds, but got %d", 
@@ -80,6 +89,9 @@ func AssertFunctionTimeout(ctx *TestContext, functionName string, expectedTimeou
 // AssertFunctionMemorySize asserts that a Lambda function has the expected memory size.
 func AssertFunctionMemorySize(ctx *TestContext, functionName string, expectedMemorySize int32) {
 	config := GetFunction(ctx, functionName)
+	if config == nil {
+		return // GetFunction already called FailNow
+	}
 	
 	if config.MemorySize != expectedMemorySize {
 		ctx.T.Errorf("Expected function '%s' to have memory size %d MB, but got %d", 
@@ -91,6 +103,9 @@ func AssertFunctionMemorySize(ctx *TestContext, functionName string, expectedMem
 // AssertFunctionState asserts that a Lambda function is in the expected state.
 func AssertFunctionState(ctx *TestContext, functionName string, expectedState types.State) {
 	config := GetFunction(ctx, functionName)
+	if config == nil {
+		return // GetFunction already called FailNow
+	}
 	
 	if config.State != expectedState {
 		ctx.T.Errorf("Expected function '%s' to be in state '%s', but got '%s'", 

@@ -1,6 +1,7 @@
 package lambda
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -9,6 +10,57 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Mock testing interface for assertions  
+type mockAssertionTestingT struct {
+	errors   []string
+	failed   bool
+	failNow  bool
+}
+
+func (m *mockAssertionTestingT) Errorf(format string, args ...interface{}) {
+	m.errors = append(m.errors, fmt.Sprintf(format, args...))
+	m.failed = true
+}
+
+func (m *mockAssertionTestingT) Error(args ...interface{}) {
+	m.errors = append(m.errors, fmt.Sprint(args...))
+	m.failed = true
+}
+
+func (m *mockAssertionTestingT) Fail() {
+	m.failed = true
+}
+
+func (m *mockAssertionTestingT) FailNow() {
+	m.failNow = true
+}
+
+func (m *mockAssertionTestingT) Fatal(args ...interface{}) {
+	m.errors = append(m.errors, fmt.Sprint(args...))
+	m.failed = true
+	m.failNow = true
+}
+
+func (m *mockAssertionTestingT) Fatalf(format string, args ...interface{}) {
+	m.errors = append(m.errors, fmt.Sprintf(format, args...))
+	m.failed = true
+	m.failNow = true
+}
+
+func (m *mockAssertionTestingT) Helper() {
+	// No-op for mock
+}
+
+func (m *mockAssertionTestingT) Name() string {
+	return "mockAssertionTestingT"
+}
+
+func (m *mockAssertionTestingT) reset() {
+	m.errors = nil
+	m.failed = false
+	m.failNow = false
+}
 
 // Test data factories for function configuration assertions
 
@@ -26,7 +78,7 @@ func createTestFunctionConfiguration() *types.FunctionConfiguration {
 		State:         types.StateActive,
 		StateReason:   aws.String("Function is active"),
 		Version:       aws.String("$LATEST"),
-		Environment: &types.Environment{
+		Environment: &types.EnvironmentResponse{
 			Variables: map[string]string{
 				"NODE_ENV": "production",
 				"API_KEY":  "test-api-key",

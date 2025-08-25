@@ -351,10 +351,24 @@ func calculateBackoffDelay(attempt int, config RetryConfig) time.Duration {
 	
 	for i := 0; i < attempt; i++ {
 		nextMultiplier := multiplier * config.Multiplier
-		// Check if next multiplication would cause overflow or exceed max delay
-		if nextMultiplier > maxDelayFloat/baseDelayFloat || nextMultiplier < multiplier {
+		
+		// Handle special cases for multipliers
+		if config.Multiplier == 0.0 {
+			// Zero multiplier should result in zero delay after first iteration
+			multiplier = 0.0
+			break
+		}
+		
+		// Check for overflow (but allow fractional multipliers that decrease)
+		if nextMultiplier > maxDelayFloat/baseDelayFloat {
 			return config.MaxDelay
 		}
+		
+		// Only treat decreasing multiplier as overflow if it's not intentional (fractional)
+		if config.Multiplier > 1.0 && nextMultiplier < multiplier {
+			return config.MaxDelay
+		}
+		
 		multiplier = nextMultiplier
 	}
 	
