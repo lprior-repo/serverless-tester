@@ -258,15 +258,32 @@ func mergeLogsOptions(userOpts *LogsOptions) *LogsOptions {
 		return defaults
 	}
 	
-	// Use defaults for unset values
-	if userOpts.MaxLines == 0 {
-		userOpts.MaxLines = defaults.MaxLines
-	}
-	if userOpts.Timeout == 0 {
-		userOpts.Timeout = defaults.Timeout
+	// Create a new merged options struct without modifying the input
+	merged := &LogsOptions{
+		StartTime:     userOpts.StartTime,
+		EndTime:       userOpts.EndTime,
+		FilterPattern: userOpts.FilterPattern,
+		MaxLines:      userOpts.MaxLines,
+		ParseLogs:     userOpts.ParseLogs,
+		Timeout:       userOpts.Timeout,
 	}
 	
-	return userOpts
+	// Apply defaults for zero values
+	if merged.MaxLines == 0 {
+		merged.MaxLines = defaults.MaxLines
+	}
+	if merged.Timeout == 0 {
+		merged.Timeout = defaults.Timeout
+	}
+	
+	// For ParseLogs, default to true (our default behavior)
+	// Since Go bool zero value is false, we assume users want parsing by default
+	// unless they explicitly set ParseLogs to false in their options
+	if !merged.ParseLogs {
+		merged.ParseLogs = defaults.ParseLogs
+	}
+	
+	return merged
 }
 
 // retrieveCloudWatchLogs fetches log events from CloudWatch
@@ -386,32 +403,58 @@ func extractRequestID(message string) string {
 		}
 	}
 	
+	// Also check for Lambda log format: timestamp\trequest-id\tlevel\tmessage
+	parts := strings.Split(message, "\t")
+	if len(parts) >= 2 {
+		// Second part might be a request ID (after timestamp)
+		requestIDCandidate := strings.TrimSpace(parts[1])
+		// Simple heuristic: request IDs are typically alphanumeric with hyphens and reasonable length
+		if len(requestIDCandidate) > 5 && len(requestIDCandidate) < 50 {
+			// Basic validation for request ID pattern (contains hyphens, alphanumeric)
+			if strings.Contains(requestIDCandidate, "-") && isAlphanumericWithHyphens(requestIDCandidate) {
+				return requestIDCandidate
+			}
+		}
+	}
+	
 	return ""
+}
+
+// isAlphanumericWithHyphens checks if string contains only alphanumeric characters and hyphens
+func isAlphanumericWithHyphens(s string) bool {
+	for _, char := range s {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || 
+			 (char >= '0' && char <= '9') || char == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // extractLogLevel extracts log level from message
 func extractLogLevel(message string) string {
 	message = strings.ToUpper(message)
 	
-	levels := []string{"ERROR", "WARN", "INFO", "DEBUG", "TRACE"}
+	// Check for Lambda-specific log patterns first (these are always INFO level)
+	if strings.Contains(message, "REPORT REQUESTID:") {
+		return "INFO"
+	}
+	
+	if strings.Contains(message, "START REQUESTID:") {
+		return "INFO"
+	}
+	
+	if strings.Contains(message, "END REQUESTID:") {
+		return "INFO"
+	}
+	
+	// Check for standard log levels (order matters: more specific first)
+	levels := []string{"ERROR", "WARN", "DEBUG", "TRACE", "INFO"}
 	
 	for _, level := range levels {
 		if strings.Contains(message, level) {
 			return level
 		}
-	}
-	
-	// Check for Lambda-specific log patterns
-	if strings.Contains(message, "REPORT RequestId:") {
-		return "INFO"
-	}
-	
-	if strings.Contains(message, "START RequestId:") {
-		return "INFO"
-	}
-	
-	if strings.Contains(message, "END RequestId:") {
-		return "INFO"
 	}
 	
 	return ""

@@ -130,7 +130,7 @@ func ExampleQueryOperations() {
 	customerID := "customer-789"
 	
 	// Create test data
-	_ = /* orders */ []map[string]types.AttributeValue{
+	orders := []map[string]types.AttributeValue{
 		{
 			"customer_id": &types.AttributeValueMemberS{Value: customerID},
 			"order_id":    &types.AttributeValueMemberS{Value: "order-001"},
@@ -158,7 +158,7 @@ func ExampleQueryOperations() {
 	fmt.Printf("Creating %d orders for customer %s\n", len(orders), customerID)
 	
 	// Query all orders for customer
-	_ = /* keyConditionExpression */ "customer_id = :customer_id"
+	keyConditionExpression := "customer_id = :customer_id"
 	_ = /* expressionAttributeValues */ map[string]types.AttributeValue{
 		":customer_id": &types.AttributeValueMemberS{Value: customerID},
 	}
@@ -186,7 +186,7 @@ func ExampleQueryOperations() {
 	fmt.Println("Querying with filter: only completed orders")
 	
 	// Query with pagination (limit 1 item at a time)
-	_ = /* paginationOptions */ dynamodb.QueryOptions{
+	paginationOptions := dynamodb.QueryOptions{
 		Limit:                  int32Ptr(1),
 		KeyConditionExpression: &keyConditionExpression,
 	}
@@ -233,7 +233,7 @@ func ExampleBatchOperations() {
 	_ = /* tableName */ "products"
 	
 	// Prepare batch write requests
-	_ = /* writeRequests */ []types.WriteRequest{
+	writeRequests := []types.WriteRequest{
 		{
 			PutRequest: &types.PutRequest{
 				Item: map[string]types.AttributeValue{
@@ -273,7 +273,7 @@ func ExampleBatchOperations() {
 	fmt.Println("Using retry mechanism for batch writes")
 	
 	// Batch read items
-	_ = /* keys */ []map[string]types.AttributeValue{
+	keys := []map[string]types.AttributeValue{
 		{"id": &types.AttributeValueMemberS{Value: "product-001"}},
 		{"id": &types.AttributeValueMemberS{Value: "product-002"}},
 		{"id": &types.AttributeValueMemberS{Value: "product-003"}},
@@ -289,7 +289,7 @@ func ExampleBatchOperations() {
 	fmt.Println("Using retry mechanism for batch reads")
 	
 	// Clean up with batch delete
-	_ = /* deleteRequests */ []types.WriteRequest{
+	deleteRequests := []types.WriteRequest{
 		{
 			DeleteRequest: &types.DeleteRequest{
 				Key: map[string]types.AttributeValue{
@@ -322,7 +322,7 @@ func ExampleBatchOperations() {
 func ExampleTransactionalOperations() {
 	fmt.Println("DynamoDB transactional operations:")
 	
-	_ = /* tableName */ "accounts"
+	tableName := "accounts"
 	
 	// Setup test accounts
 	_ = /* account1Item */ map[string]types.AttributeValue{
@@ -341,7 +341,7 @@ func ExampleTransactionalOperations() {
 	fmt.Println("Setting up test accounts: Alice ($1000) and Bob ($500)")
 	
 	// Perform transactional transfer (Alice sends $100 to Bob)
-	_ = /* transferAmount */ "100"
+	transferAmount := "100"
 	
 	_ = /* transactItems */ []types.TransactWriteItem{
 		{
@@ -419,7 +419,7 @@ func ExampleTransactionalOperations() {
 func ExampleAssertionPatterns() {
 	fmt.Println("DynamoDB assertion patterns:")
 	
-	_ = /* tableName */ "test-table"
+	tableName := "test-table"
 	
 	// Assert table exists (assuming it's been created)
 	// dynamodb.AssertTableExists(t, tableName)
@@ -479,7 +479,7 @@ func ExampleScanOperations() {
 	_ = /* tableName */ "inventory"
 	
 	// Create test data
-	_ = /* items */ []map[string]types.AttributeValue{
+	items := []map[string]types.AttributeValue{
 		{
 			"id":       &types.AttributeValueMemberS{Value: "item-001"},
 			"category": &types.AttributeValueMemberS{Value: "electronics"},

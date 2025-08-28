@@ -33,7 +33,7 @@ func ExampleBasicWorkflow() {
 	}
 	
 	// Define a simple state machine
-	_ = /* definition */ &stepfunctions.StateMachineDefinition{
+	definition := &stepfunctions.StateMachineDefinition{
 		Name: "example-workflow-" + time.Now().Format("20060102-150405"),
 		Definition: `{
 			"Comment": "A Hello World example",
@@ -69,7 +69,7 @@ func ExampleBasicWorkflow() {
 	// }()
 	
 	// Step 2: Start an execution
-	_ = /* input */ stepfunctions.NewInput().
+	input := stepfunctions.NewInput().
 		Set("greeting", "Hello").
 		Set("target", "World").
 		Set("timestamp", time.Now().Unix())
@@ -80,7 +80,8 @@ func ExampleBasicWorkflow() {
 	//     return
 	// }
 	// Expected: execution.ExecutionArn should not be empty
-	fmt.Printf("Starting execution with input: greeting=%s, target=%s\n", "Hello", "World")
+	inputJSON, _ := input.ToJSON()
+	fmt.Printf("Starting execution with input: %s\n", inputJSON)
 	
 	// Step 3: Wait for completion
 	// finalResult, err := stepfunctions.WaitForExecutionE(ctx, execution.ExecutionArn, &stepfunctions.WaitOptions{
@@ -137,7 +138,7 @@ func ExampleInputBuilder() {
 	fmt.Println("Step Functions input builder patterns:")
 	
 	// Create complex input using fluent API
-	_ = /* input */ stepfunctions.NewInput().
+	input := stepfunctions.NewInput().
 		Set("orderId", "order-123").
 		Set("customerId", "customer-456").
 		Set("amount", 99.99).
@@ -171,7 +172,7 @@ func ExampleInputBuilderPatterns() {
 	fmt.Println("Step Functions input builder patterns:")
 	
 	// Order processing input
-	_ = /* orderInput */ stepfunctions.CreateOrderInput("order-789", "customer-101", []string{"item1", "item2"})
+	orderInput := stepfunctions.CreateOrderInput("order-789", "customer-101", []string{"item1", "item2"})
 	orderJSON, err := orderInput.ToJSON()
 	if err != nil {
 		fmt.Printf("Failed to create order JSON: %v\n", err)
@@ -182,7 +183,7 @@ func ExampleInputBuilderPatterns() {
 	}
 	
 	// Generic workflow input
-	_ = /* workflowInput */ stepfunctions.CreateWorkflowInput("user-onboarding", map[string]interface{}{
+	workflowInput := stepfunctions.CreateWorkflowInput("user-onboarding", map[string]interface{}{
 		"userId":    "user-123",
 		"email":     "user@example.com",
 		"requestId": "req-456",
@@ -197,7 +198,7 @@ func ExampleInputBuilderPatterns() {
 	}
 	
 	// Retryable operation input
-	_ = /* retryInput */ stepfunctions.CreateRetryableInput("risky-operation", 3)
+	retryInput := stepfunctions.CreateRetryableInput("risky-operation", 3)
 	retryJSON, err := retryInput.ToJSON()
 	if err != nil {
 		fmt.Printf("Failed to create retry JSON: %v\n", err)
@@ -214,13 +215,13 @@ func ExampleAssertions() {
 	fmt.Println("Step Functions assertion patterns:")
 	
 	// Create example execution results
-	_ = /* successResult */ &stepfunctions.ExecutionResult{
+	successResult := &stepfunctions.ExecutionResult{
 		Status:        types.ExecutionStatusSucceeded,
 		Output:        `{"result": "success", "data": {"processed": 100}}`,
 		ExecutionTime: 45 * time.Second,
 	}
 	
-	_ = /* failedResult */ &stepfunctions.ExecutionResult{
+	failedResult := &stepfunctions.ExecutionResult{
 		Status: types.ExecutionStatusFailed,
 		Error:  "States.TaskFailed",
 		Cause:  "Lambda function returned error",
@@ -249,7 +250,7 @@ func ExampleAssertions() {
 	}
 	
 	// JSON output assertions
-	_ = /* expectedJSON */ map[string]interface{}{
+	expectedJSON := map[string]interface{}{
 		"result": "success",
 		"data": map[string]interface{}{
 			"processed": float64(100),
@@ -281,18 +282,18 @@ func ExampleAssertions() {
 func ExampleExecutionPattern() {
 	fmt.Println("Step Functions execution pattern matching:")
 	
-	_ = /* result */ &stepfunctions.ExecutionResult{
+	result := &stepfunctions.ExecutionResult{
 		Status:        types.ExecutionStatusSucceeded,
 		Output:        `{"status": "completed", "itemsProcessed": 250}`,
 		ExecutionTime: 2 * time.Minute,
 	}
 	
 	// Define expected pattern
-	_ = /* status */ types.ExecutionStatusSucceeded
-	_ = /* minTime */ 1 * time.Minute
-	_ = /* maxTime */ 5 * time.Minute
+	status := types.ExecutionStatusSucceeded
+	minTime := 1 * time.Minute
+	maxTime := 5 * time.Minute
 	
-	_ = /* pattern */ &stepfunctions.ExecutionPattern{
+	pattern := &stepfunctions.ExecutionPattern{
 		Status:           &status,
 		OutputContains:   "completed",
 		MinExecutionTime: &minTime,
@@ -305,7 +306,7 @@ func ExampleExecutionPattern() {
 	}
 	
 	// Test pattern with JSON
-	_ = /* jsonPattern */ &stepfunctions.ExecutionPattern{
+	jsonPattern := &stepfunctions.ExecutionPattern{
 		Status: &status,
 		OutputJSON: map[string]interface{}{
 			"status":         "completed",
@@ -324,7 +325,7 @@ func ExamplePollingConfiguration() {
 	fmt.Println("Step Functions polling configuration patterns:")
 	
 	// Simple polling - constant interval
-	_ = /* simpleConfig */ &stepfunctions.PollConfig{
+	simpleConfig := &stepfunctions.PollConfig{
 		MaxAttempts:        30,
 		Interval:           2 * time.Second,
 		Timeout:            60 * time.Second,
@@ -332,14 +333,14 @@ func ExamplePollingConfiguration() {
 	}
 	
 	// Test interval calculation
-	_ = /* interval1 */ simpleConfig.Interval
-	_ = /* interval2 */ simpleConfig.Interval
+	interval1 := simpleConfig.Interval
+	interval2 := simpleConfig.Interval
 	if interval1 == 2*time.Second && interval2 == 2*time.Second {
 		fmt.Println("✓ Simple polling: constant 2s interval")
 	}
 	
 	// Exponential backoff polling
-	_ = /* backoffConfig */ &stepfunctions.PollConfig{
+	backoffConfig := &stepfunctions.PollConfig{
 		MaxAttempts:        20,
 		Interval:           1 * time.Second,
 		Timeout:            120 * time.Second,
@@ -349,9 +350,9 @@ func ExamplePollingConfiguration() {
 	}
 	
 	// Test exponential backoff calculation
-	_ = /* baseInterval */ backoffConfig.Interval
-	_ = /* secondInterval */ time.Duration(float64(backoffConfig.Interval) * 1.5)
-	_ = /* thirdInterval */ time.Duration(float64(backoffConfig.Interval) * 1.5 * 1.5)
+	baseInterval := backoffConfig.Interval
+	secondInterval := time.Duration(float64(backoffConfig.Interval) * 1.5)
+	thirdInterval := time.Duration(float64(backoffConfig.Interval) * 1.5 * 1.5)
 	
 	fmt.Printf("Exponential backoff intervals: %v -> %v -> %v\n", baseInterval, secondInterval, thirdInterval)
 	
@@ -373,36 +374,36 @@ func ExampleErrorHandling() {
 	fmt.Println("Step Functions error handling patterns:")
 	
 	// Empty state machine name validation
-	_ = /* name */ ""
+	name := ""
 	if name == "" {
 		fmt.Println("✓ Empty state machine name is invalid")
 	}
 	
 	// Empty definition validation
-	_ = /* definition */ ""
+	definition := ""
 	if definition == "" {
 		fmt.Println("✓ Empty definition is invalid")
 	}
 	
 	// Empty execution name validation
-	_ = /* execName */ ""
+	execName := ""
 	if execName == "" {
 		fmt.Println("✓ Empty execution name is invalid")
 	}
 	
 	// Invalid ARN validation examples
-	_ = /* invalidArn */ "invalid-arn"
+	invalidArn := "invalid-arn"
 	if !strings.HasPrefix(invalidArn, "arn:aws:states:") {
 		fmt.Println("✓ Invalid state machine ARN format detected")
 	}
 	
-	_ = /* invalidExecArn */ "invalid-execution-arn"
+	invalidExecArn := "invalid-execution-arn"
 	if !strings.HasPrefix(invalidExecArn, "arn:aws:states:") {
 		fmt.Println("✓ Invalid execution ARN format detected")
 	}
 	
 	// Valid ARN example
-	_ = /* validArn */ "arn:aws:states:us-east-1:123456789012:stateMachine:MyStateMachine"
+	validArn := "arn:aws:states:us-east-1:123456789012:stateMachine:MyStateMachine"
 	if strings.HasPrefix(validArn, "arn:aws:states:") {
 		fmt.Println("✓ Valid ARN format confirmed")
 	}
@@ -429,7 +430,7 @@ func ExampleCompleteWorkflow() {
 	}
 	
 	// 1. Define state machine with error handling
-	_ = /* definition */ &stepfunctions.StateMachineDefinition{
+	definition := &stepfunctions.StateMachineDefinition{
 		Name: "complete-example-" + time.Now().Format("20060102-150405"),
 		Definition: `{
 			"Comment": "Complete example with error handling",
@@ -506,24 +507,25 @@ func ExampleCompleteWorkflow() {
 	fmt.Println("Executing state machine with order input (3 minute timeout)")
 	
 	// 5. Comprehensive result validation
-	_ = /* pattern */ &stepfunctions.ExecutionPattern{
+	pattern := &stepfunctions.ExecutionPattern{
 		Status: func() *types.ExecutionStatus {
-	_ = /* s */ types.ExecutionStatusSucceeded
+			s := types.ExecutionStatusSucceeded
 			return &s
 		}(),
 		OutputContains: "processed successfully",
 		MinExecutionTime: func() *time.Duration {
-	_ = /* d */ 1 * time.Second
+			d := 1 * time.Second
 			return &d
 		}(),
 		MaxExecutionTime: func() *time.Duration {
-	_ = /* d */ 2 * time.Minute
+			d := 2 * time.Minute
 			return &d
 		}(),
 	}
 	
 	// stepfunctions.AssertExecutionPattern(t, result, pattern)
-	fmt.Println("Validating execution matches pattern: succeeded, contains 'processed successfully', 1s-2min duration")
+	fmt.Printf("Validating execution matches pattern: %+v\n", pattern)
+	fmt.Println("Expected: succeeded, contains 'processed successfully', 1s-2min duration")
 	
 	// 6. Verify execution metrics
 	// stepfunctions.AssertExecutionCountByStatus(t, ctx, stateMachine.StateMachineArn, 
@@ -543,7 +545,7 @@ func ExampleHistoryAnalysis() {
 	fmt.Println("Step Functions execution history analysis patterns:")
 	
 	// Create sample execution history (simulated)
-	_ = /* history */ []stepfunctions.HistoryEvent{
+	history := []stepfunctions.HistoryEvent{
 		{
 			ID:        1,
 			Type:      types.HistoryEventTypeExecutionStarted,
@@ -622,7 +624,7 @@ func ExampleFailedStepsAnalysis() {
 	fmt.Println("Step Functions failed steps analysis patterns:")
 	
 	// Create history with multiple failed steps
-	_ = /* history */ []stepfunctions.HistoryEvent{
+	history := []stepfunctions.HistoryEvent{
 		{
 			ID:        1,
 			Type:      types.HistoryEventTypeTaskFailed,
@@ -665,8 +667,8 @@ func ExampleExecutionTimeline() {
 	fmt.Println("Step Functions execution timeline patterns:")
 	
 	// Create sample history events
-	_ = /* baseTime */ time.Now().Add(-10 * time.Minute)
-	_ = /* history */ []stepfunctions.HistoryEvent{
+	baseTime := time.Now().Add(-10 * time.Minute)
+	history := []stepfunctions.HistoryEvent{
 		{
 			ID:        1,
 			Type:      types.HistoryEventTypeExecutionStarted,
@@ -761,7 +763,7 @@ func ExampleComprehensiveDiagnostics() {
 	// and we need to diagnose the issue
 
 	// Step 1: Get execution history (simulated)
-	_ = /* history */ createComplexExecutionHistory()
+	history := createComplexExecutionHistory()
 
 	// Step 2: Perform comprehensive analysis
 	// analysis, err := stepfunctions.AnalyzeExecutionHistoryE(history)
@@ -816,7 +818,7 @@ func ExampleComprehensiveDiagnostics() {
 
 // Helper function to create complex execution history for testing
 func createComplexExecutionHistory() []stepfunctions.HistoryEvent {
-	_ = /* baseTime */ time.Now().Add(-20 * time.Minute)
+	baseTime := time.Now().Add(-20 * time.Minute)
 	
 	return []stepfunctions.HistoryEvent{
 		{

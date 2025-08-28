@@ -25,7 +25,7 @@ func ExampleEventBridgeWorkflow() {
 	}
 	
 	// Step 1: Create a custom event bus
-	_ = /* busConfig */ eventbridge.EventBusConfig{
+	busConfig := eventbridge.EventBusConfig{
 		Name: "my-example-bus",
 		Tags: map[string]string{
 			"Environment": "example",
@@ -38,7 +38,7 @@ func ExampleEventBridgeWorkflow() {
 	fmt.Printf("Creating event bus: %s\n", busConfig.Name)
 	
 	// Step 2: Create a rule with event pattern
-	_ = /* ruleConfig */ eventbridge.RuleConfig{
+	ruleConfig := eventbridge.RuleConfig{
 		Name:         "user-signup-rule",
 		Description:  "Rule for user signup events",
 		EventPattern: `{"source": ["user.service"], "detail-type": ["User Signup"]}`,
@@ -51,7 +51,7 @@ func ExampleEventBridgeWorkflow() {
 	fmt.Printf("Creating rule: %s\n", ruleConfig.Name)
 	
 	// Step 3: Add targets to the rule
-	_ = /* targets */ []eventbridge.TargetConfig{
+	targets := []eventbridge.TargetConfig{
 		{
 			ID:      "lambda-processor",
 			Arn:     "arn:aws:lambda:us-east-1:123456789012:function:process-signup",
@@ -101,7 +101,7 @@ func ExampleArchiveAndReplay() {
 	}
 	
 	// Create event bus for archiving
-	_ = /* busConfig */ eventbridge.EventBusConfig{
+	busConfig := eventbridge.EventBusConfig{
 		Name: "audit-event-bus",
 	}
 	
@@ -109,7 +109,7 @@ func ExampleArchiveAndReplay() {
 	fmt.Printf("Creating event bus for archiving: %s\n", busConfig.Name)
 	
 	// Create archive for the event bus
-	_ = /* archiveConfig */ eventbridge.ArchiveConfig{
+	archiveConfig := eventbridge.ArchiveConfig{
 		ArchiveName:    "audit-archive",
 		EventSourceArn: "arn:aws:events:us-east-1:123456789012:event-bus/audit-event-bus",
 		EventPattern:   `{"source": ["audit.service"]}`,
@@ -122,7 +122,7 @@ func ExampleArchiveAndReplay() {
 	fmt.Printf("Creating archive: %s with %d day retention\n", archiveConfig.ArchiveName, archiveConfig.RetentionDays)
 	
 	// Send some events that will be archived
-	_ = /* auditEvents */ []eventbridge.CustomEvent{
+	auditEvents := []eventbridge.CustomEvent{
 		eventbridge.BuildCustomEvent("audit.service", "User Login", map[string]interface{}{
 			"userId":    "user-001",
 			"timestamp": time.Now().Add(-2 * time.Hour).Unix(),
@@ -143,14 +143,14 @@ func ExampleArchiveAndReplay() {
 	fmt.Println("Waiting for archive to be enabled")
 	
 	// Create replay for the last 3 hours
-	_ = /* replayConfig */ eventbridge.ReplayConfig{
+	replayConfig := eventbridge.ReplayConfig{
 		ReplayName:     "audit-replay",
 		EventSourceArn: "arn:aws:events:us-east-1:123456789012:archive/audit-archive",
 		EventStartTime: time.Now().Add(-3 * time.Hour),
 		EventEndTime:   time.Now(),
 		Destination: types.ReplayDestination{
 			Arn: func() *string {
-	_ = /* arn */ "arn:aws:events:us-east-1:123456789012:event-bus/audit-event-bus"
+				arn := "arn:aws:events:us-east-1:123456789012:event-bus/audit-event-bus"
 				return &arn
 			}(),
 		},
@@ -180,7 +180,7 @@ func ExampleBatchEventProcessing() {
 	}
 	
 	// Create multiple events from different AWS services
-	_ = /* events */ []eventbridge.CustomEvent{
+	events := []eventbridge.CustomEvent{
 		eventbridge.BuildS3Event("data-bucket", "uploads/file1.csv", "ObjectCreated:Put"),
 		eventbridge.BuildS3Event("data-bucket", "uploads/file2.json", "ObjectCreated:Put"),
 		eventbridge.BuildEC2Event("i-1234567890abcdef0", "running", "pending"),
@@ -222,7 +222,7 @@ func ExampleScheduledEvents() {
 	}
 	
 	// Create a rule that triggers every day at 9 AM UTC
-	_ = /* dailyReportRule */ eventbridge.BuildScheduledEventWithCron("0 9 * * ? *", map[string]interface{}{
+	dailyReportRule := eventbridge.BuildScheduledEventWithCron("0 9 * * ? *", map[string]interface{}{
 		"reportType": "daily",
 	})
 	dailyReportRule.Name = "daily-report-trigger"
@@ -233,7 +233,7 @@ func ExampleScheduledEvents() {
 	fmt.Printf("Creating daily scheduled rule: %s (9 AM UTC)\n", dailyReportRule.Name)
 	
 	// Create a rule that triggers every 5 minutes
-	_ = /* healthCheckRule */ eventbridge.BuildScheduledEventWithRate(5, "minutes")
+	healthCheckRule := eventbridge.BuildScheduledEventWithRate(5, "minutes")
 	healthCheckRule.Name = "health-check-trigger"
 	healthCheckRule.Description = "Triggers health checks every 5 minutes"
 	
@@ -242,13 +242,13 @@ func ExampleScheduledEvents() {
 	fmt.Printf("Creating rate scheduled rule: %s (every 5 minutes)\n", healthCheckRule.Name)
 	
 	// Add Lambda targets to both rules
-	_ = /* dailyTarget */ []eventbridge.TargetConfig{{
+	dailyTarget := []eventbridge.TargetConfig{{
 		ID:    "daily-report-lambda",
 		Arn:   "arn:aws:lambda:us-east-1:123456789012:function:generate-daily-report",
 		Input: `{"reportType": "daily", "format": "pdf"}`,
 	}}
 	
-	_ = /* healthCheckTarget */ []eventbridge.TargetConfig{{
+	healthCheckTarget := []eventbridge.TargetConfig{{
 		ID:  "health-check-lambda",
 		Arn: "arn:aws:lambda:us-east-1:123456789012:function:health-check",
 	}}
@@ -278,7 +278,7 @@ func ExampleCrossAccountEventBridge() {
 	}
 	
 	// Create custom event bus for cross-account events
-	_ = /* crossAccountBus */ eventbridge.EventBusConfig{
+	crossAccountBus := eventbridge.EventBusConfig{
 		Name: "cross-account-bus",
 	}
 	
@@ -290,7 +290,7 @@ func ExampleCrossAccountEventBridge() {
 	fmt.Println("Granting permission to account 123456789012 for events:PutEvents")
 	
 	// Create rule to process cross-account events
-	_ = /* crossAccountRule */ eventbridge.RuleConfig{
+	crossAccountRule := eventbridge.RuleConfig{
 		Name:         "cross-account-rule",
 		Description:  "Process events from partner account",
 		EventPattern: `{"source": ["partner.service"], "account": ["123456789012"]}`,
@@ -302,7 +302,7 @@ func ExampleCrossAccountEventBridge() {
 	fmt.Printf("Creating cross-account rule: %s\n", crossAccountRule.Name)
 	
 	// Add target to process cross-account events
-	_ = /* targets */ []eventbridge.TargetConfig{{
+	targets := []eventbridge.TargetConfig{{
 		ID:      "cross-account-processor",
 		Arn:     "arn:aws:lambda:us-east-1:123456789012:function:process-partner-events",
 		RoleArn: "arn:aws:iam::123456789012:role/CrossAccountEventRole",
@@ -325,14 +325,14 @@ func ExampleEventPatternTesting() {
 	fmt.Println("EventBridge event pattern testing patterns:")
 	
 	// Test various event patterns
-	_ = /* patterns */ []string{
+	patterns := []string{
 		`{"source": ["user.service"], "detail-type": ["User Created"]}`,
 		`{"source": ["aws.s3"], "detail": {"eventName": ["ObjectCreated:Put"]}}`,
 		`{"source": ["order.service"], "detail": {"status": ["completed"], "amount": [{"numeric": [">", 100]}]}}`,
 	}
 	
 	// Create test events
-	_ = /* testEvents */ []eventbridge.CustomEvent{
+	testEvents := []eventbridge.CustomEvent{
 		eventbridge.BuildCustomEvent("user.service", "User Created", map[string]interface{}{
 			"userId": "user-123",
 			"email":  "test@example.com",
@@ -350,7 +350,7 @@ func ExampleEventPatternTesting() {
 		fmt.Printf("Testing pattern %d: %s\n", i+1, pattern)
 		
 		// Validate pattern format
-	_ = /* isValid */ eventbridge.ValidateEventPattern(pattern)
+		isValid := eventbridge.ValidateEventPattern(pattern)
 		if isValid {
 			fmt.Println("Pattern is valid")
 		} else {
@@ -386,7 +386,7 @@ func ExampleEventBridgeCleanup() {
 	fmt.Println("Listing all custom event buses")
 	
 	// Simulate event buses for demonstration
-	_ = /* simulatedBuses */ []string{"my-custom-bus", "cross-account-bus", "audit-bus"}
+	simulatedBuses := []string{"my-custom-bus", "cross-account-bus", "audit-bus"}
 	
 	for _, busName := range simulatedBuses {
 		// Skip default bus
@@ -405,7 +405,7 @@ func ExampleEventBridgeCleanup() {
 		fmt.Printf("Listing rules for bus: %s\n", busName)
 		
 		// Simulate rules cleanup
-	_ = /* simulatedRules */ []string{"rule-1", "rule-2"}
+		simulatedRules := []string{"rule-1", "rule-2"}
 		for _, ruleName := range simulatedRules {
 			fmt.Printf("Deleting rule: %s\n", ruleName)
 			// eventbridge.DeleteRule(ctx, ruleName, busName)
@@ -425,7 +425,7 @@ func ExampleEventBridgeCleanup() {
 	fmt.Println("Listing all archives")
 	
 	// Simulate archives cleanup
-	_ = /* simulatedArchives */ []string{"audit-archive", "backup-archive"}
+	simulatedArchives := []string{"audit-archive", "backup-archive"}
 	for _, archiveName := range simulatedArchives {
 		fmt.Printf("Deleting archive: %s\n", archiveName)
 		// eventbridge.DeleteArchive(ctx, archiveName)

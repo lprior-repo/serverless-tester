@@ -20,8 +20,8 @@ func ExampleBasicUsage() {
 	fmt.Println("Basic Lambda usage patterns:")
 	
 	// Example 1: Basic Lambda function invocation
-	_ = /* functionName */ "my-test-function"
-	_ = /* payload */ `{"message": "Hello, Lambda!"}`
+	functionName := "my-test-function"
+	payload := `{"message": "Hello, Lambda!"}`
 	
 	// This would invoke an actual Lambda function in real implementations
 	// result := lambda.Invoke(ctx, functionName, payload)
@@ -42,11 +42,11 @@ func ExampleBasicUsage() {
 	
 	// Example 3: Event-driven processing with S3 events
 	functionName = "s3-processor-function"
-	_ = /* bucketName */ "test-bucket"
-	_ = /* objectKey */ "test-data/file.json"
+	bucketName := "test-bucket"
+	objectKey := "test-data/file.json"
 	
 	// Build S3 event
-	_ = /* s3Event */ lambda.BuildS3Event(bucketName, objectKey, "s3:ObjectCreated:Put")
+	s3Event := lambda.BuildS3Event(bucketName, objectKey, "s3:ObjectCreated:Put")
 	
 	// Invoke with S3 event
 	// result := lambda.Invoke(ctx, functionName, s3Event)
@@ -91,7 +91,7 @@ func ExampleTableDrivenValidation() {
 	fmt.Println("Table-driven validation patterns:")
 	
 	// Table-driven scenarios for multiple payload validation
-	_ = /* scenarios */ []struct {
+	scenarios := []struct {
 		name              string
 		functionName      string
 		payload           string
@@ -145,42 +145,42 @@ func ExampleTableDrivenValidation() {
 func ExampleAdvancedEventProcessing() {
 	fmt.Println("Advanced event processing patterns:")
 	
-	_ = /* functionName */ "multi-trigger-function"
+	functionName := "multi-trigger-function"
 		
 	// S3 event processing
-	_ = /* s3Event */ lambda.BuildS3Event("data-bucket", "input/data.json", "s3:ObjectCreated:Put")
+	s3Event := lambda.BuildS3Event("data-bucket", "input/data.json", "s3:ObjectCreated:Put")
 	
 	// result := lambda.Invoke(ctx, functionName, s3Event)
 	// lambda.AssertInvokeSuccess(ctx, result)
 	// lambda.AssertPayloadContains(ctx, result, "s3_processed")
 	
-	fmt.Println("S3 event processing pattern completed")
+	fmt.Printf("S3 event processing pattern completed for %s with event: %s\n", functionName, s3Event[:50]+"...")
 		
 	// DynamoDB event processing
-	_ = /* keys */ map[string]interface{}{
+	keys := map[string]interface{}{
 		"id": map[string]interface{}{"S": "item-123"},
 	}
-	_ = /* dynamoEvent */ lambda.BuildDynamoDBEvent("users-table", "INSERT", keys)
+	dynamoEvent := lambda.BuildDynamoDBEvent("users-table", "INSERT", keys)
 	
 	// result := lambda.Invoke(ctx, functionName, dynamoEvent)
 	// lambda.AssertInvokeSuccess(ctx, result)
 	// lambda.AssertPayloadContains(ctx, result, "dynamodb_processed")
 	
-	fmt.Println("DynamoDB event processing pattern completed")
+	fmt.Printf("DynamoDB event processing pattern completed with event: %s\n", dynamoEvent[:50]+"...")
 		
 	// SQS event processing
-	_ = /* queueUrl */ "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
-	_ = /* messageBody */ `{"order_id": "order-456", "status": "pending"}`
-	_ = /* sqsEvent */ lambda.BuildSQSEvent(queueUrl, messageBody)
+	queueUrl := "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+	messageBody := `{"order_id": "order-456", "status": "pending"}`
+	sqsEvent := lambda.BuildSQSEvent(queueUrl, messageBody)
 	
 	// result := lambda.Invoke(ctx, functionName, sqsEvent)
 	// lambda.AssertInvokeSuccess(ctx, result)
 	// lambda.AssertPayloadContains(ctx, result, "sqs_processed")
 	
-	fmt.Println("SQS event processing pattern completed")
+	fmt.Printf("SQS event processing pattern completed with event: %s\n", sqsEvent[:50]+"...")
 		
 	// API Gateway event processing
-	_ = /* apiEvent */ lambda.BuildAPIGatewayEvent("POST", "/api/orders", `{"item": "widget", "quantity": 5}`)
+	apiEvent := lambda.BuildAPIGatewayEvent("POST", "/api/orders", `{"item": "widget", "quantity": 5}`)
 	
 	// result := lambda.Invoke(ctx, functionName, apiEvent)
 	// lambda.AssertInvokeSuccess(ctx, result)
@@ -190,18 +190,18 @@ func ExampleAdvancedEventProcessing() {
 	// lambda.ParseInvokeOutput(result, &apiResponse)
 	// Expected: apiResponse["statusCode"] == 200
 	
-	fmt.Println("API Gateway event processing pattern completed")
+	fmt.Printf("API Gateway event processing pattern completed with event: %s\n", apiEvent[:50]+"...")
 }
 
 // ExampleEventSourceMapping demonstrates event source mapping patterns
 func ExampleEventSourceMapping() {
 	fmt.Println("SQS event source mapping patterns:")
 	
-	_ = /* functionName */ "sqs-consumer-function"
-	_ = /* queueArn */ "arn:aws:sqs:us-east-1:123456789012:test-queue"
+	functionName := "sqs-consumer-function"
+	queueArn := "arn:aws:sqs:us-east-1:123456789012:test-queue"
 	
 	// Create event source mapping configuration
-	_ = /* mappingConfig */ lambda.EventSourceMappingConfig{
+	mappingConfig := lambda.EventSourceMappingConfig{
 		EventSourceArn:   queueArn,
 		FunctionName:     functionName,
 		BatchSize:        10,
@@ -230,12 +230,12 @@ func ExampleEventSourceMapping() {
 func ExamplePerformancePatterns() {
 	fmt.Println("Performance and load patterns:")
 	
-	_ = /* functionName */ "high-load-function"
-	_ = /* payload */ `{"load_test": true}`
+	functionName := "high-load-function"
+	payload := `{"load_test": true}`
 	
 	// Concurrent invocations pattern
-	_ = /* concurrency */ 10
-	_ = /* results */ make(chan *lambda.InvokeResult, concurrency)
+	concurrency := 10
+	results := make(chan *lambda.InvokeResult, concurrency)
 	
 	for i := 0; i < concurrency; i++ {
 		go func() {
@@ -246,16 +246,16 @@ func ExamplePerformancePatterns() {
 	}
 	
 	// Collect results
-	_ = /* successCount */ 0
+	successCount := 0
 	for i := 0; i < concurrency; i++ {
-	_ = /* result */ <-results
+		result := <-results
 		if result.StatusCode == 200 {
 			successCount++
 		}
 	}
 	
 	// Expected: all invocations should succeed
-	fmt.Printf("Concurrent invocations completed: %d/%d successful\n", successCount, concurrency)
+	fmt.Printf("Concurrent invocations completed: %d/%d successful with payload: %s\n", successCount, concurrency, payload)
 	
 	// Timeout configuration patterns
 	functionName = "timeout-test-function"
@@ -265,7 +265,7 @@ func ExamplePerformancePatterns() {
 	// lambda.AssertFunctionTimeout(ctx, functionName, 30)
 	
 	// Invocation with custom timeout
-	_ = /* opts */ &lambda.InvokeOptions{
+	opts := &lambda.InvokeOptions{
 		Timeout: 5 * time.Second,
 	}
 	
@@ -279,10 +279,10 @@ func ExamplePerformancePatterns() {
 func ExampleErrorHandlingAndRecovery() {
 	fmt.Println("Error handling and recovery patterns:")
 	
-	_ = /* functionName */ "error-test-function"
+	functionName := "error-test-function"
 	
 	// Function error handling
-	_ = /* errorPayload */ `{"trigger_error": "division_by_zero"}`
+	errorPayload := `{"trigger_error": "division_by_zero"}`
 	
 	// In real implementations:
 	// result := lambda.Invoke(ctx, functionName, errorPayload)
@@ -299,7 +299,7 @@ func ExampleErrorHandlingAndRecovery() {
 	functionName = "recovery-test-function"
 	
 	// Recovery from transient errors
-	_ = /* recoverablePayload */ `{"simulate_transient_error": true}`
+	recoverablePayload := `{"simulate_transient_error": true}`
 	
 	// Use retry logic to handle transient errors
 	// result := lambda.InvokeWithRetry(ctx, functionName, recoverablePayload, 3)
@@ -319,7 +319,7 @@ func ExampleComprehensiveIntegration() {
 	// Note: Would require actual AWS Lambda functions and resources in practice
 		
 	// Step 1: API Gateway receives order
-	_ = /* orderData */ `{
+	orderData := `{
 		"customer_id": "cust-123",
 		"items": [
 			{"sku": "item-001", "quantity": 2, "price": 29.99},
@@ -333,11 +333,12 @@ func ExampleComprehensiveIntegration() {
 		}
 	}`
 	
-	_ = /* apiEvent */ lambda.BuildAPIGatewayEvent("POST", "/api/orders", orderData)
+	apiEvent := lambda.BuildAPIGatewayEvent("POST", "/api/orders", orderData)
 		
 	// Order validation function
 	// validationResult := lambda.Invoke(ctx, "order-validator", apiEvent)
 	// lambda.AssertInvokeSuccess(ctx, validationResult)
+	fmt.Printf("Order validation with API event: %s\n", apiEvent[:50]+"...")
 	
 	// Step 2: Process order (triggered by SQS)
 	// orderProcessorPayload := lambda.ExtractPayloadFromResult(validationResult)
@@ -373,7 +374,7 @@ func ExampleDataFactories() {
 	fmt.Println("Data factory patterns:")
 	
 	// Data factory functions following functional programming principles
-	_ = /* createUserPayload */ func(name string, age int) string {
+	createUserPayload := func(name string, age int) string {
 		return lambda.MarshalPayload(map[string]interface{}{
 			"name":       name,
 			"age":        age,
@@ -381,7 +382,7 @@ func ExampleDataFactories() {
 		})
 	}
 	
-	_ = /* createOrderPayload */ func(customerID string, amount float64) string {
+	createOrderPayload := func(customerID string, amount float64) string {
 		return lambda.MarshalPayload(map[string]interface{}{
 			"customer_id": customerID,
 			"amount":      amount,
@@ -392,21 +393,21 @@ func ExampleDataFactories() {
 	}
 	
 	// Example usage of data factories
-	_ = /* userPayload */ createUserPayload("John Doe", 30)
+	userPayload := createUserPayload("John Doe", 30)
 	
 	// result := lambda.Invoke(ctx, "user-processor", userPayload)
 	// lambda.AssertInvokeSuccess(ctx, result)
 	// lambda.AssertPayloadContains(ctx, result, "user_created")
 	
-	fmt.Printf("User payload created: contains John Doe and age 30\n")
+	fmt.Printf("User payload created: %s\n", userPayload)
 	
-	_ = /* orderPayload */ createOrderPayload("cust-123", 99.99)
+	orderPayload := createOrderPayload("cust-123", 99.99)
 	
 	// result := lambda.Invoke(ctx, "order-processor", orderPayload)
 	// lambda.AssertInvokeSuccess(ctx, result)
 	// lambda.AssertPayloadContains(ctx, result, "order_processed")
 	
-	fmt.Printf("Order payload created: contains cust-123 and amount 99.99\n")
+	fmt.Printf("Order payload created: %s\n", orderPayload)
 }
 
 // ExampleValidationHelpers shows comprehensive validation patterns
@@ -414,7 +415,7 @@ func ExampleValidationHelpers() {
 	fmt.Println("Configuration validation patterns:")
 	
 	// Create expected configuration for validation
-	_ = /* expectedConfig */ &lambda.FunctionConfiguration{
+	expectedConfig := &lambda.FunctionConfiguration{
 		FunctionName: "production-function",
 		Runtime:      types.RuntimeNodejs18x,
 		Handler:      "index.handler",
@@ -428,7 +429,7 @@ func ExampleValidationHelpers() {
 	}
 	
 	// Example function configuration (in real implementations, this would come from GetFunction)
-	_ = /* actualConfig */ &lambda.FunctionConfiguration{
+	actualConfig := &lambda.FunctionConfiguration{
 		FunctionName: "production-function",
 		Runtime:      types.RuntimeNodejs18x,
 		Handler:      "index.handler",
@@ -443,7 +444,7 @@ func ExampleValidationHelpers() {
 	}
 	
 	// Validate configuration
-	_ = /* errors */ lambda.ValidateFunctionConfiguration(actualConfig, expectedConfig)
+	errors := lambda.ValidateFunctionConfiguration(actualConfig, expectedConfig)
 	
 	// In this case, no errors should be found since actual matches or exceeds expected
 	if len(errors) == 0 {
@@ -451,7 +452,7 @@ func ExampleValidationHelpers() {
 	}
 	
 	// Example with validation errors
-	_ = /* invalidConfig */ &lambda.FunctionConfiguration{
+	invalidConfig := &lambda.FunctionConfiguration{
 		FunctionName: "production-function",
 		Runtime:      types.RuntimePython39, // Wrong runtime
 		Handler:      "app.handler",         // Wrong handler
@@ -479,8 +480,8 @@ func ExampleFluentAPIPatterns() {
 	fmt.Println("Fluent API patterns:")
 	
 	// Current functional syntax
-	_ = /* functionName */ "test-function"
-	_ = /* payload */ `{"test": true}`
+	functionName := "test-function"
+	payload := `{"test": true}`
 	
 	// Standard function calls
 	// result := lambda.Invoke(ctx, functionName, payload)

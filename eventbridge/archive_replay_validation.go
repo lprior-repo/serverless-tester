@@ -9,8 +9,8 @@ import (
 
 // Replay validation constants
 const (
-	MaxReplayDurationHours = 24 * 30 // 30 days maximum replay duration
-	MinReplayDurationSeconds = 60    // 1 minute minimum replay duration
+	MaxReplayDurationHours   = 24 * 30 // 30 days maximum replay duration
+	MinReplayDurationSeconds = 60      // 1 minute minimum replay duration
 )
 
 // ValidateReplayConfig validates a replay configuration and panics on error (Terratest pattern)
@@ -40,14 +40,14 @@ func ValidateReplayConfigE(config ReplayConfig) error {
 	// Validate minimum duration
 	duration := config.EventEndTime.Sub(config.EventStartTime)
 	if duration.Seconds() < MinReplayDurationSeconds {
-		return fmt.Errorf("replay duration must be at least %d seconds, got %.0f seconds", 
+		return fmt.Errorf("replay duration must be at least %d seconds, got %.0f seconds",
 			MinReplayDurationSeconds, duration.Seconds())
 	}
 
 	// Validate maximum duration
 	maxDuration := time.Duration(MaxReplayDurationHours) * time.Hour
 	if duration > maxDuration {
-		return fmt.Errorf("replay duration cannot exceed %d hours, got %.0f hours", 
+		return fmt.Errorf("replay duration cannot exceed %d hours, got %.0f hours",
 			MaxReplayDurationHours, duration.Hours())
 	}
 
@@ -177,15 +177,15 @@ func BuildArchiveConfigWithPattern(archiveName string, eventSourceArn string, ev
 // isEventBridgeRule checks if an ARN represents an EventBridge rule
 func isEventBridgeRule(arn string) bool {
 	// EventBridge rule ARN format: arn:aws:events:region:account:rule/rule-name
-	return arnRegex.MatchString(arn) && 
-		   GetTargetServiceType(arn) == "eventbridge" && 
-		   (containsPattern(arn, ":rule/") || containsPattern(arn, ":event-bus/"))
+	return arnRegex.MatchString(arn) &&
+		GetTargetServiceType(arn) == "eventbridge" &&
+		(containsPattern(arn, ":rule/") || containsPattern(arn, ":event-bus/"))
 }
 
 // containsPattern checks if a string contains a specific pattern
 func containsPattern(s string, pattern string) bool {
-	return len(s) >= len(pattern) && 
-		   findSubstring(s, pattern) >= 0
+	return len(s) >= len(pattern) &&
+		findSubstring(s, pattern) >= 1
 }
 
 // findSubstring finds the index of a substring in a string (-1 if not found)
@@ -193,13 +193,13 @@ func findSubstring(s string, substr string) int {
 	if len(substr) == 0 {
 		return 0
 	}
-	
+
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
 			return i
 		}
 	}
-	
+
 	return -1
 }
 
@@ -213,7 +213,7 @@ func EstimateReplayTime(eventCount int64, eventsPerSecond int32) time.Duration {
 	if eventsPerSecond <= 0 {
 		eventsPerSecond = 100 // Default processing rate
 	}
-	
+
 	processingSeconds := eventCount / int64(eventsPerSecond)
 	return time.Duration(processingSeconds) * time.Second
 }
@@ -221,21 +221,21 @@ func EstimateReplayTime(eventCount int64, eventsPerSecond int32) time.Duration {
 // ValidateReplayTimeRange validates that a replay time range is within acceptable bounds
 func ValidateReplayTimeRange(startTime time.Time, endTime time.Time) error {
 	now := time.Now()
-	
+
 	// Check that times are not in the future
 	if startTime.After(now) {
 		return fmt.Errorf("replay start time cannot be in the future")
 	}
-	
+
 	if endTime.After(now) {
 		return fmt.Errorf("replay end time cannot be in the future")
 	}
-	
+
 	// Validate the range
 	config := ReplayConfig{
 		EventStartTime: startTime,
 		EventEndTime:   endTime,
 	}
-	
+
 	return ValidateReplayConfigE(config)
 }
