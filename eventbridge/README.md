@@ -1,53 +1,73 @@
-# EventBridge Testing Package
+# 📡 EventBridge Functional Testing Package
 
-A comprehensive AWS EventBridge testing package for the vasdeference module that follows strict Terratest patterns. This package provides complete EventBridge operations with rule management, pattern testing, and custom bus support, designed for robust serverless infrastructure testing.
+A **pure functional programming** EventBridge testing package built with immutable data structures, monadic error handling, and type-safe operations using `samber/lo` and `samber/mo`.
 
-## Features
+## ✨ Functional Programming Features
 
-### Core Operations
-- **Event Publishing**: `PutEvent/PutEventE`, `PutEvents/PutEventsE` with retry logic
-- **Rule Management**: `CreateRule/CreateRuleE`, `DeleteRule/DeleteRuleE`, `EnableRule/EnableRuleE`, `DisableRule/DisableRuleE`
-- **Target Management**: `PutTargets/PutTargetsE`, `RemoveTargets/RemoveTargetsE`
-- **Event Bus Management**: `CreateEventBus/CreateEventBusE`, `DeleteEventBus/DeleteEventBusE`
-- **Archive & Replay**: `CreateArchive/CreateArchiveE`, `StartReplay/StartReplayE`
-- **Cross-Account Permissions**: `PutPermission/PutPermissionE`, `RemovePermission/RemovePermissionE`
+🔒 **Type-Safe Event Operations** with Go generics for event patterns  
+🚀 **Immutable Event Structures** with functional builders  
+📦 **Pure Function Pipeline** for event publishing and rule management  
+⚡ **Monadic Error Handling** with safe operations and pattern validation  
+🔧 **Functional Composition** for complex event routing and filtering  
+🧮 **Mathematical Precision** - predictable, verifiable event operations  
 
-### Event Builders
-Comprehensive event builders for AWS services:
-- `BuildS3Event` - S3 bucket events
-- `BuildEC2Event` - EC2 instance state changes
-- `BuildLambdaEvent` - Lambda function events
-- `BuildDynamoDBEvent` - DynamoDB stream events
-- `BuildSQSEvent` - SQS message events
-- `BuildCloudWatchEvent` - CloudWatch alarm events
-- `BuildScheduledEventWithCron/Rate` - Scheduled events
+## 🏗️ Pure Functional Architecture
 
-### Assertions
-- `AssertRuleExists`, `AssertRuleEnabled`, `AssertTargetExists`
-- `AssertEventSent`, `AssertPatternMatches`
-- `AssertArchiveExists`, `AssertReplayCompleted`
-- `WaitForReplayCompletion`, `WaitForArchiveState`
+### Zero-Mutation Event System
+- **Immutable Events**: All event structures are immutable with functional builders
+- **Pure Functions**: Event validation, pattern matching, and routing are pure
+- **Monadic Results**: Safe error handling with `Option[T]` and `Result[T]` types
+- **Type Safety**: Compile-time guarantees for event patterns and routing
 
-### Validation Utilities
-- `ValidateEventPattern` - Event pattern validation
-- `TestEventPattern` - Pattern matching verification
-- Retry logic with exponential backoff
-- Comprehensive error handling
+### Functional Event Operations
+- **Event Builders**: Immutable event creation with method chaining
+- **Pattern Validation**: Pure functions for event pattern verification
+- **Rule Composition**: Functional composition for complex event routing
+- **Archive & Replay**: Immutable operations with monadic error handling
 
-## Architecture
+## 🚀 Functional Usage Examples
 
-This package follows the **Pure Core, Imperative Shell** pattern:
-
-- **Pure Core**: Event builders, pattern validation, retry calculations
-- **Imperative Shell**: AWS API calls, I/O operations, logging
-
-All functions follow the Terratest pattern with both `Function` (panics on error) and `FunctionE` (returns error) variants.
-
-## Usage Examples
-
-### Basic Event Publishing
+### Immutable Event Creation & Publishing
 
 ```go
+import (
+    "vasdeference/eventbridge"
+    "github.com/samber/mo"
+)
+
+func TestFunctionalEventBridge(t *testing.T) {
+    // Immutable event bus configuration
+    config := NewFunctionalEventBridgeConfig("orders-bus",
+        WithEventBridgeTimeout(30*time.Second),
+        WithEventPattern(`{"source": ["ecommerce"]}`),
+        WithRuleState(types.RuleStateEnabled),
+    )
+    
+    // Build immutable event with functional composition
+    orderEvent := NewFunctionalEventBridgeEvent(
+        "ecommerce.orders",
+        "Order Created", 
+        `{"orderId": "12345", "amount": 99.99}`,
+    ).WithEventBusName("orders-bus").
+      WithResources([]string{"arn:aws:lambda:...:function:process-order"})
+    
+    // Publish with monadic error handling
+    publishResult := SimulateFunctionalEventBridgePutEvents(
+        []FunctionalEventBridgeEvent{orderEvent}, 
+        config,
+    )
+    
+    // Safe error handling without exceptions
+    publishResult.GetError().
+        Map(func(err error) error {
+            t.Errorf("Publishing failed: %v", err)
+            return err
+        }).
+        OrElse(func() {
+            t.Log("✓ Events published successfully")
+        })
+}
+```
 func TestEventPublishing(t *testing.T) {
     ctx := &eventbridge.TestContext{
         T:         t,

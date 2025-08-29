@@ -1,80 +1,140 @@
-# Vas Deference Testing Infrastructure
+# SFX Functional Testing Infrastructure
 
-This directory contains comprehensive testing infrastructure for the Vas Deference framework, designed to solve the critical challenge of testing a testing framework without breaking the tests themselves.
+This directory contains comprehensive functional testing infrastructure for the SFX framework, built using pure functional programming principles with **samber/lo** and **samber/mo** to solve the critical challenge of testing a testing framework without breaking the tests themselves.
 
-## Overview
+## Functional Testing Overview
 
-The testing infrastructure provides:
+The functional testing infrastructure provides:
 
-1. **MockTestingT**: A mock implementation of the TestingT interface for testing framework behavior
-2. **Test Utilities**: Comprehensive utilities for AWS client mocking, test data generation, and validation
-3. **Test Fixtures**: Reusable test data and AWS event samples
-4. **Framework Validation**: Tests that validate the framework works correctly without interfering with test execution
+1. **Immutable MockTestingT**: Functional mock implementation with zero mutations and monadic state management
+2. **Functional Test Utilities**: Pure functional utilities for AWS client mocking, immutable test data generation, and composable validation
+3. **Immutable Test Fixtures**: Type-safe, reusable test data and AWS event samples using functional options pattern
+4. **Functional Framework Validation**: Monadic validation tests that ensure framework correctness without test interference
 
 ## Key Features
 
-### MockTestingT (mock.go)
+### Functional MockTestingT (mock.go)
 
-The `MockTestingT` struct provides a thread-safe mock implementation of the `TestingT` interface:
+The `FunctionalMockTestingT` struct provides an immutable, thread-safe mock implementation using functional programming principles:
 
 ```go
-mockT := testutils.NewMockTestingT("test-name")
+// Create immutable mock configuration
+mockConfig := NewFunctionalMockConfig(
+    WithTestName("test-name"),
+    WithThreadSafety(true),
+    WithStateTracking(true),
+)
 
-// Use like any TestingT
-mockT.Helper()
-mockT.Errorf("Test error: %s", "message")
-mockT.FailNow()
+// Create functional mock instance
+mockT := CreateFunctionalMockTestingT(mockConfig)
 
-// Verify behavior without breaking tests
-assert.True(t, mockT.WasErrorfCalled())
-assert.Equal(t, 2, mockT.GetErrorfCallCount())
+// Use with immutable state transitions
+updatedMock := mockT.
+    CallHelper().
+    CallErrorf("Test error: %s", "message").
+    CallFailNow()
+
+// Verify behavior functionally with monadic queries
+helperCalled := QueryFunctionalMockState(updatedMock, WasHelperCalled)
+errorfCount := QueryFunctionalMockState(updatedMock, GetErrorfCallCount)
 ```
 
-**Key Methods:**
-- `NewMockTestingT(name)` - Create new mock instance
-- `WasHelperCalled()`, `WasErrorfCalled()`, etc. - Check if methods were called
-- `GetErrorMessages()`, `GetLogMessages()` - Retrieve captured messages
-- `Reset()` - Clear all state for reuse
-- Thread-safe for concurrent testing
+**Functional Key Features:**
+- `CreateFunctionalMockTestingT(config)` - Immutable mock instance creation
+- `QueryFunctionalMockState(mock, query)` - Pure function state queries with `mo.Option[T]`
+- `GetFunctionalMessages(mock)` - Immutable message retrieval using `lo.Map`
+- `ResetFunctionalMock(mock)` - Returns new mock instance with cleared state
+- Thread-safe through immutability and functional state management
 
-### Test Utilities (utils.go)
+### Functional Test Utilities (utils.go)
 
-Comprehensive testing utilities including:
+Comprehensive functional testing utilities using immutable patterns:
 
-**AWS Client Mocking:**
+**Functional AWS Client Mocking:**
 ```go
-utils := testutils.NewTestUtils()
-mockLambda := utils.CreateMockLambdaClient()
-mockDynamoDB := utils.CreateMockDynamoDBClient()
+// Create immutable utility configuration
+utilsConfig := NewFunctionalTestUtilsConfig(
+    WithAWSMockingEnabled(true),
+    WithDataGeneration(true),
+    WithAssertionHelpers(true),
+)
+
+// Create immutable AWS client mocks
+clientMocks := CreateFunctionalAWSMocks(utilsConfig, []AWSService{
+    LambdaService, DynamoDBService, S3Service,
+})
+
+// Access mocks functionally
+lambdaMock := GetFunctionalMock(clientMocks, LambdaService)
+dynamoMock := GetFunctionalMock(clientMocks, DynamoDBService)
 ```
 
-**Test Data Generation:**
+**Functional Test Data Generation:**
 ```go
-randomString := utils.GenerateRandomString(10)
-uuid := utils.GenerateUUID()
-number := utils.GenerateRandomNumber(1, 100)
+// Generate immutable test data using functional options
+testDataConfig := NewFunctionalDataGenerationConfig(
+    WithStringLength(10),
+    WithNumberRange(1, 100),
+    WithUUIDGeneration(true),
+)
+
+generatedData := GenerateFunctionalTestData(testDataConfig).
+    Map(func(data TestData) TestData {
+        return ValidateTestData(data)
+    })
 ```
 
-**Assertion Helpers:**
+**Functional Assertion Helpers:**
 ```go
-utils.AssertStringNotEmpty(t, value, "should not be empty")
-utils.AssertJSONValid(t, jsonString, "should be valid JSON")
-utils.AssertAWSArn(t, arn, "should be valid ARN")
+// Create immutable assertion configuration
+assertionConfig := NewFunctionalAssertionConfig(
+    WithStringValidation(),
+    WithJSONValidation(),
+    WithAWSArnValidation(),
+)
+
+// Execute functional assertions with monadic results
+validationResults := []mo.Result[AssertionResult]{
+    AssertFunctionalStringNotEmpty(assertionConfig, value, "should not be empty"),
+    AssertFunctionalJSONValid(assertionConfig, jsonString, "should be valid JSON"),
+    AssertFunctionalAWSArn(assertionConfig, arn, "should be valid ARN"),
+}
+
+// Aggregate assertion results
+aggregatedResult := AggregateFunctionalAssertions(validationResults)
 ```
 
-**Environment Management:**
+**Functional Environment Management:**
 ```go
-envManager := utils.CreateEnvironmentManager()
-envManager.SetEnv("TEST_VAR", "value")
-envManager.RestoreAll() // Restore original values
+// Create immutable environment configuration
+envConfig := NewFunctionalEnvironmentConfig(
+    WithVariable("TEST_VAR", "value"),
+    WithVariable("AWS_REGION", "us-east-1"),
+    WithRestoreOnCleanup(true),
+)
+
+// Apply environment changes functionally
+environmentResult := ApplyFunctionalEnvironment(envConfig).
+    Map(func(env FunctionalEnvironment) FunctionalEnvironment {
+        return ValidateEnvironmentState(env)
+    })
 ```
 
-**Retry Utilities:**
+**Functional Retry Utilities:**
 ```go
-err := utils.RetryOperation(func() error {
-    // Your potentially flaky operation
-    return doSomething()
-}, 3, 100*time.Millisecond)
+// Create immutable retry configuration
+retryConfig := NewFunctionalRetryConfig(
+    WithMaxAttempts(3),
+    WithBackoffDelay(100*time.Millisecond),
+    WithExponentialBackoff(true),
+)
+
+// Execute operation with functional retry logic
+result := ExecuteFunctionalRetry(retryConfig, func() mo.Result[OperationResult] {
+    return ExecutePotentiallyFlakOperation()
+}).Map(func(result OperationResult) OperationResult {
+    return ValidateOperationResult(result)
+})
 ```
 
 ### Test Fixtures (fixtures.go)

@@ -1,22 +1,22 @@
-# ⚡ Vas Deference - Functional Programming Examples
+# ⚡ SFX Framework - Pure Functional Programming Examples
 
-Comprehensive real-world testing examples demonstrating the full power of the **pure functional programming** Vas Deference framework with immutable data structures, monadic error handling, and mathematical precision.
+Comprehensive real-world testing examples demonstrating the full power of the **pure functional programming** SFX framework with immutable data structures, monadic error handling, and mathematical precision using **samber/lo** and **samber/mo**.
 
 ## 🚀 Functional Programming Overview
 
-This examples directory showcases the complete capabilities of the **functional Vas Deference** framework:
+This examples directory showcases the complete capabilities of the **functional SFX** framework:
 
-- **🏗️ Functional Core**: Immutable configurations, monadic operations, and pure functions
-- **⚡ Functional Lambda**: Type-safe Lambda operations with monadic results  
-- **🗄️ Functional DynamoDB**: Immutable table operations with validation pipelines
-- **📡 Functional EventBridge**: Event-driven patterns with immutable events
-- **🔄 Functional Step Functions**: Workflow orchestration with immutable state machines
+- **🏗️ Functional Core**: Immutable configurations with functional options pattern
+- **⚡ Functional Lambda**: Type-safe Lambda operations with `mo.Option[T]` and `mo.Result[T]`  
+- **🗄️ Functional DynamoDB**: Immutable table operations with `lo.Reduce` pipelines
+- **📡 Functional EventBridge**: Event-driven patterns with immutable event structures
+- **🔄 Functional Step Functions**: Workflow orchestration with pure function composition
 
 ### **Pure Functional Programming Benefits:**
-- **✅ Type Safety** - Compile-time error prevention with Go generics
-- **✅ Immutability** - Zero mutations, only functional transformations
-- **✅ Monadic Operations** - Safe error handling without exceptions
-- **✅ Function Composition** - Elegant data transformation pipelines
+- **✅ Type Safety** - Compile-time error prevention with Go generics and monads
+- **✅ Zero Mutations** - All data structures are immutable by design
+- **✅ Monadic Operations** - Safe error handling with `mo.Option[T]` and `mo.Result[T]`
+- **✅ Function Composition** - Elegant data pipelines using `lo.Reduce`, `lo.Map`, `lo.Filter`
 - **✅ Mathematical Precision** - Predictable, composable, verifiable operations
 
 ## Advanced Examples
@@ -32,16 +32,29 @@ Production-ready E2E testing with the full VasDeference feature set:
 - **Error handling** and recovery testing
 
 ```go
-// Advanced E2E testing with parallel execution
-vasdeference.TableTest[OrderRequest, OrderResult](t, "E-Commerce Pipeline").
-    Case("standard_order", validOrder, expectedResult).
-    Case("bulk_order", bulkOrder, bulkResult).
-    Case("international_order", intlOrder, intlResult).
-    Parallel().
-    WithMaxWorkers(10).
-    Repeat(5).
-    Timeout(120*time.Second).
-    Run(processCompleteOrder, validateOrderResult)
+// Functional E2E testing with immutable configuration and monadic operations
+config := NewFunctionalTestConfig(
+    WithParallelExecution(true),
+    WithMaxWorkers(10),
+    WithTimeout(120*time.Second),
+    WithRetryPolicy(5),
+)
+
+orderResults := lo.Map(testCases, func(testCase OrderTestCase, _ int) mo.Result[OrderResult] {
+    return ProcessFunctionalOrder(testCase.Input).
+        Map(func(result OrderResult) OrderResult {
+            return validateOrderResult(result)
+        })
+})
+
+// Collect results with monadic error handling
+finalResult := lo.Reduce(orderResults, func(acc mo.Result[[]OrderResult], result mo.Result[OrderResult], _ int) mo.Result[[]OrderResult] {
+    return acc.FlatMap(func(results []OrderResult) mo.Result[[]OrderResult] {
+        return result.Map(func(r OrderResult) []OrderResult {
+            return append(results, r)
+        })
+    })
+}, mo.Some([]OrderResult{}))
 ```
 
 ### [⚡ Performance Testing](./performance/)
@@ -55,13 +68,26 @@ High-performance testing with statistical analysis:
 - **Regression testing** with baseline comparison
 
 ```go
-// Statistical performance benchmarking
-benchmark := vasdeference.TableTest[TestInput, TestOutput](t, "Performance").
-    Case("baseline", input, expected).
-    Benchmark(testFunction, 10000)
+// Functional performance benchmarking with immutable metrics
+benchmarkConfig := NewFunctionalBenchmarkConfig(
+    WithIterations(10000),
+    WithWarmupIterations(1000),
+    WithMetricsCollection(true),
+)
 
-assert.Less(t, benchmark.AverageTime, 100*time.Millisecond)
-assert.Less(t, benchmark.P95Time, 200*time.Millisecond)
+performanceResult := RunFunctionalBenchmark(benchmarkConfig, testFunction).
+    Map(func(metrics BenchmarkMetrics) BenchmarkMetrics {
+        return validatePerformanceThresholds(metrics)
+    })
+
+performanceResult.GetError().
+    Map(func(err error) error {
+        t.Errorf("Performance benchmark failed: %v", err)
+        return err
+    }).
+    OrElse(func() {
+        t.Log("✓ Performance benchmarks passed")
+    })
 ```
 
 ### [🏢 Enterprise Integration](./enterprise/)
@@ -75,16 +101,26 @@ Enterprise-grade testing patterns:
 - **Access control** and audit trail validation
 
 ```go
-// Multi-environment promotion pipeline
-stages := []PromotionStage{
-    {From: "dev", To: "staging", RequiredTests: []string{"unit", "integration", "security"}},
-    {From: "staging", To: "prod", RequiredTests: []string{"e2e", "performance", "compliance"}},
-}
+// Functional multi-environment promotion pipeline with immutable configuration
+promotionConfig := NewFunctionalPromotionConfig(
+    WithStage("dev", "staging", []string{"unit", "integration", "security"}),
+    WithStage("staging", "prod", []string{"e2e", "performance", "compliance"}),
+    WithValidationPolicy(StrictValidation),
+)
 
-for _, stage := range stages {
-    result := executePromotionPipeline(t, ctx, stage)
-    validatePromotionSuccess(t, result)
-}
+promotionResults := lo.Map(promotionConfig.Stages, func(stage PromotionStage, _ int) mo.Result[PromotionResult] {
+    return ExecuteFunctionalPromotion(stage).
+        Map(func(result PromotionResult) PromotionResult {
+            return ValidatePromotionSuccess(result)
+        })
+})
+
+// Aggregate results with early failure detection
+finalResult := lo.Reduce(promotionResults, func(acc mo.Result[bool], result mo.Result[PromotionResult], _ int) mo.Result[bool] {
+    return acc.FlatMap(func(success bool) mo.Result[bool] {
+        return result.Map(func(_ PromotionResult) bool { return success })
+    })
+}, mo.Some(true))
 ```
 
 ### [🔄 Advanced Workflows](./workflows/)
@@ -98,16 +134,30 @@ Sophisticated workflow testing:
 - **Event-driven workflows** with EventBridge integration
 
 ```go
-// Parallel workflow orchestration
-executions := []stepfunctions.ParallelExecution{
-    {StateMachineArn: orderSM, ExecutionName: "order-1", Input: order1},
-    {StateMachineArn: paymentSM, ExecutionName: "payment-1", Input: payment1},
-    {StateMachineArn: inventorySM, ExecutionName: "inventory-1", Input: inventory1},
+// Functional parallel workflow orchestration with immutable configuration
+workflowConfig := NewFunctionalWorkflowConfig(
+    WithMaxConcurrency(15),
+    WithTimeout(300*time.Second),
+    WithFailFastPolicy(false),
+    WithCompletionWait(true),
+)
+
+executionSpecs := []WorkflowExecutionSpec{
+    NewExecutionSpec(orderSM, "order-1", order1),
+    NewExecutionSpec(paymentSM, "payment-1", payment1),
+    NewExecutionSpec(inventorySM, "inventory-1", inventory1),
 }
 
-results := stepfunctions.ParallelExecutions(ctx, executions, &stepfunctions.ParallelExecutionConfig{
-    MaxConcurrency: 15, WaitForCompletion: true, FailFast: false, Timeout: 300*time.Second,
+// Execute all workflows functionally with monadic error handling
+workflowResults := lo.Map(executionSpecs, func(spec WorkflowExecutionSpec, _ int) mo.Result[WorkflowResult] {
+    return ExecuteFunctionalWorkflow(workflowConfig, spec).
+        Map(func(result WorkflowResult) WorkflowResult {
+            return ValidateWorkflowCompletion(result)
+        })
 })
+
+// Aggregate results with proper error propagation
+aggregatedResult := AggregateFunctionalResults(workflowResults)
 ```
 
 ### [🌍 Real-World Scenarios](./scenarios/)
@@ -121,95 +171,161 @@ Production-tested business scenarios:
 - **Healthcare Systems**: Patient data processing with HIPAA compliance
 
 ```go
-// Complete e-commerce order processing
-func TestCompleteOrderProcessing(t *testing.T) {
-    ctx := setupECommerceInfrastructure(t)
-    defer ctx.VDF.Cleanup()
+// Complete functional e-commerce order processing with immutable pipeline
+func TestFunctionalOrderProcessing(t *testing.T) {
+    infrastructureConfig := NewFunctionalInfrastructureConfig(
+        WithOrderService("order-lambda"),
+        WithPaymentService("payment-lambda"),
+        WithInventoryService("inventory-lambda"),
+        WithNotificationService("notification-lambda"),
+    )
     
-    // Process order through complete business pipeline
-    result := processCompleteOrder(t, ctx, testOrder)
+    // Create immutable order processing pipeline
+    processingPipeline := NewFunctionalOrderPipeline(
+        WithOrderValidation(),
+        WithInventoryReservation(),
+        WithPaymentProcessing(),
+        WithShippingArrangement(),
+        WithNotificationSending(),
+        WithAnalyticsRecording(),
+    )
     
-    // Validate all business aspects
-    validateOrderCreation(t, result.OrderCreated)
-    validateInventoryReservation(t, result.InventoryReserved)  
-    validatePaymentProcessing(t, result.PaymentProcessed)
-    validateShippingArrangement(t, result.ShippingArranged)
-    validateCustomerNotifications(t, result.NotificationsSent)
-    validateAnalyticsEvents(t, result.AnalyticsRecorded)
+    // Execute pipeline with monadic error handling
+    orderResult := ProcessFunctionalOrder(processingPipeline, testOrder).
+        Map(func(result OrderResult) OrderResult {
+            return ValidateCompleteOrderResult(result)
+        })
+    
+    // Assert success with functional error handling
+    orderResult.GetError().
+        Map(func(err error) error {
+            t.Errorf("Order processing failed: %v", err)
+            return err
+        }).
+        OrElse(func() {
+            t.Log("✓ Complete order processing successful")
+        })
 }
 ```
 
 ## Key Enhanced Features
 
-### Advanced Table Testing
+### Functional Table Testing
 ```go
-// Sophisticated table-driven testing with parallel execution
-TableTest[Input, Output](t, "Test Name").
-    Case("case1", input1, expected1).
-    Case("case2", input2, expected2).
-    Case("case3", input3, expected3).
-    Parallel().                    // Enable parallel execution
-    WithMaxWorkers(10).           // Control concurrency
-    Repeat(5).                    // Repeat each case 5 times
-    Timeout(60*time.Second).      // Per-case timeout
-    Focus([]string{"case2"}).     // Run only specific cases
-    Skip(func(name string) bool { // Skip cases conditionally
+// Immutable table-driven testing with functional configuration
+testConfig := NewFunctionalTableTestConfig(
+    WithParallelExecution(true),
+    WithMaxWorkers(10),
+    WithRepeatCount(5),
+    WithTimeout(60*time.Second),
+    WithFocusFilter([]string{"case2"}),
+    WithSkipPredicate(func(name string) bool {
         return strings.Contains(name, "slow")
-    }).
-    Run(testFunction, assertFunction)
+    }),
+)
+
+testCases := []FunctionalTestCase[Input, Output]{
+    NewTestCase("case1", input1, expected1),
+    NewTestCase("case2", input2, expected2),
+    NewTestCase("case3", input3, expected3),
+}
+
+// Execute functional table test with monadic results
+testResults := lo.Map(testCases, func(testCase FunctionalTestCase[Input, Output], _ int) mo.Result[TestResult] {
+    return ExecuteFunctionalTest(testConfig, testCase, testFunction).
+        Map(func(result TestResult) TestResult {
+            return assertFunction(result)
+        })
+})
+
+// Aggregate results with proper error handling
+finalResult := AggregateFunctionalTestResults(testResults)
 ```
 
-### Database Snapshots with Advanced Features
+### Functional Database Snapshots
 ```go
-// Bulletproof database state management
-snapshot := dynamodb.CreateSnapshot(t, []string{tableName}, dynamodb.SnapshotOptions{
-    Compression: true,             // Compress snapshots
-    Encryption:  true,             // Encrypt sensitive data
-    Incremental: true,             // Only store changes
-    Metadata: map[string]interface{}{
+// Immutable database state management with functional configuration
+snapshotConfig := NewFunctionalSnapshotConfig(
+    WithCompression(true),
+    WithEncryption(true),
+    WithIncrementalBackup(true),
+    WithMetadata(map[string]interface{}{
         "test_suite": "e2e_tests",
         "version":    "v1.2.3",
-    },
-})
-defer snapshot.Restore()
+    }),
+)
 
-// Validate database state with snapshots
-snapshot.MatchDynamoDBTable(t, "expected_state", tableName)
+snapshotResult := CreateFunctionalSnapshot([]string{tableName}, snapshotConfig).
+    Map(func(snapshot FunctionalSnapshot) FunctionalSnapshot {
+        return ValidateSnapshotIntegrity(snapshot)
+    })
+
+// Restore database state functionally with monadic error handling
+restoreResult := snapshotResult.FlatMap(func(snapshot FunctionalSnapshot) mo.Result[RestoreResult] {
+    return RestoreFunctionalSnapshot(snapshot).
+        Map(func(result RestoreResult) RestoreResult {
+            return ValidateDatabaseState(result, tableName)
+        })
+})
 ```
 
-### Performance Benchmarking
+### Functional Performance Benchmarking
 ```go
-// Comprehensive performance analysis
-benchmark := TableTest[Request, Response](t, "Performance Test").
-    Case("performance_case", request, expected).
-    Benchmark(performanceFunction, 1000)
+// Immutable performance analysis with functional configuration
+benchmarkConfig := NewFunctionalBenchmarkConfig(
+    WithIterations(1000),
+    WithWarmupRounds(100),
+    WithMetricsCollection([]MetricType{AverageTime, P50, P95, P99, Throughput}),
+    WithThresholds(map[MetricType]time.Duration{
+        AverageTime: 50 * time.Millisecond,
+        P50:         30 * time.Millisecond,
+        P95:         100 * time.Millisecond,
+        P99:         200 * time.Millisecond,
+    }),
+)
 
-// Detailed performance metrics
-assert.Less(t, benchmark.AverageTime, 50*time.Millisecond)
-assert.Less(t, benchmark.P50Time, 30*time.Millisecond)
-assert.Less(t, benchmark.P95Time, 100*time.Millisecond)
-assert.Less(t, benchmark.P99Time, 200*time.Millisecond)
-assert.Greater(t, benchmark.ThroughputPerSecond, 1000.0)
+benchmarkResult := RunFunctionalBenchmark(benchmarkConfig, performanceFunction).
+    Map(func(metrics BenchmarkMetrics) BenchmarkMetrics {
+        return ValidatePerformanceThresholds(metrics, benchmarkConfig.Thresholds)
+    })
+
+// Validate performance metrics with monadic error handling
+benchmarkResult.GetError().
+    Map(func(err error) error {
+        t.Errorf("Performance benchmark failed: %v", err)
+        return err
+    }).
+    OrElse(func() {
+        t.Log("✓ All performance thresholds met")
+    })
 ```
 
-### Snapshot Testing
+### Functional Snapshot Testing
 ```go
-// Advanced snapshot testing with sanitization
-snapshotTester := snapshot.New(t, snapshot.Options{
-    SnapshotDir: "testdata/snapshots",
-    JSONIndent:  true,
-    Sanitizers: []snapshot.Sanitizer{
-        snapshot.SanitizeTimestamps(),
-        snapshot.SanitizeUUIDs(),
-        snapshot.SanitizeExecutionArn(),
-        snapshot.SanitizeCustom(`"orderId":"[^"]*"`, `"orderId":"<ORDER_ID>"`),
-    },
-})
+// Immutable snapshot testing with functional configuration
+snapshotConfig := NewFunctionalSnapshotTesterConfig(
+    WithSnapshotDirectory("testdata/snapshots"),
+    WithJSONFormatting(true),
+    WithSanitizers([]FunctionalSanitizer{
+        NewTimestampSanitizer(),
+        NewUUIDSanitizer(),
+        NewExecutionArnSanitizer(),
+        NewCustomSanitizer(`"orderId":"[^"]*"`, `"orderId":"<ORDER_ID>"`),
+    }),
+)
 
-// Validate complex data structures
-snapshotTester.MatchJSON("business_result", businessResult)
-snapshotTester.MatchDynamoDBItems("order_records", orderRecords)
-snapshotTester.MatchStepFunctionExecution("workflow_output", workflowOutput)
+// Create immutable snapshot tester
+snapshotTester := CreateFunctionalSnapshotTester(snapshotConfig)
+
+// Validate complex data structures with monadic results
+validationResults := []mo.Result[SnapshotValidation]{
+    snapshotTester.MatchJSON("business_result", businessResult),
+    snapshotTester.MatchDynamoDBItems("order_records", orderRecords),
+    snapshotTester.MatchStepFunctionExecution("workflow_output", workflowOutput),
+}
+
+// Aggregate validation results
+finalValidation := AggregateFunctionalValidations(validationResults)
 ```
 
 ## Quick Start

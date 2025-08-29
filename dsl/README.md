@@ -1,147 +1,196 @@
-# AWS Testing DSL
+# SFX Functional AWS Testing DSL
 
-A comprehensive Domain-Specific Language for AWS serverless testing that replaces the Function/FunctionE patterns with fluent, expressive interfaces.
+A comprehensive Domain-Specific Language for AWS serverless testing built on pure functional programming principles using **samber/lo** and **samber/mo** for immutable data structures and monadic error handling.
 
 ## Overview
 
-This DSL provides maximum abstraction for AWS testing, making test writing feel like natural language descriptions. It follows the key design principles:
+This functional DSL provides maximum abstraction for AWS testing while maintaining mathematical precision and type safety. It follows these core functional programming principles:
 
-- **Fluent interfaces** for maximum readability
-- **Method chaining** for natural test flow  
-- **Implicit error handling** with descriptive failures
-- **High-level abstractions** that hide AWS complexity
-- **Compositional builders** for complex scenarios
+- **Immutable configurations** with functional options pattern
+- **Monadic error handling** using `mo.Option[T]` and `mo.Result[T]`
+- **Function composition** with `lo.Map`, `lo.Filter`, and `lo.Reduce`
+- **Zero mutations** - all operations return new immutable structures
+- **Type-safe operations** leveraging Go generics for compile-time safety
 
 ## Basic Usage
 
-### Simple Lambda Function Test
+### Functional Lambda Function Test
 
 ```go
-func TestLambdaInvocation(t *testing.T) {
-    aws := NewAWS(t)
+func TestFunctionalLambdaInvocation(t *testing.T) {
+    // Create immutable Lambda configuration using functional options
+    lambdaConfig := NewFunctionalLambdaConfig(
+        WithFunctionName("my-function"),
+        WithJSONPayload(map[string]interface{}{"key": "value"}),
+        WithSynchronousInvocation(),
+        WithLogRetrieval(true),
+        WithTimeout(5 * time.Second),
+    )
     
-    result := aws.Lambda().
-        Function("my-function").
-        WithJSONPayload(map[string]interface{}{"key": "value"}).
-        Sync().
-        WithLogs().
-        Invoke()
+    // Execute Lambda function with monadic error handling
+    invocationResult := InvokeFunctionalLambda(lambdaConfig).
+        Map(func(result LambdaInvocationResult) LambdaInvocationResult {
+            return ValidateLambdaResponse(result)
+        })
     
-    result.Should().
-        Succeed().
-        And().
-        CompleteWithin(5 * time.Second).
-        And().
-        HaveMetadata("function_name", "my-function")
+    // Assert success using monadic error handling
+    invocationResult.GetError().
+        Map(func(err error) error {
+            t.Errorf("Lambda invocation failed: %v", err)
+            return err
+        }).
+        OrElse(func() {
+            t.Log("✓ Lambda invocation successful")
+        })
 }
 ```
 
-### DynamoDB Operations
+### Functional DynamoDB Operations
 
 ```go
-func TestDynamoDBOperations(t *testing.T) {
-    aws := NewAWS(t)
+func TestFunctionalDynamoDBOperations(t *testing.T) {
+    // Create immutable table configuration
+    tableConfig := NewFunctionalTableConfig(
+        WithTableName("users"),
+        WithHashKey("userId", "S"),
+        WithRangeKey("timestamp", "N"),
+        WithOnDemandBilling(),
+    )
     
-    // Create table
-    aws.DynamoDB().
-        CreateTable().
-        Named("users").
-        WithHashKey("userId", "S").
-        WithRangeKey("timestamp", "N").
-        WithOnDemandBilling().
-        Create().
-        Should().
-        Succeed()
+    // Create table with monadic error handling
+    tableCreationResult := CreateFunctionalTable(tableConfig).
+        Map(func(result TableCreationResult) TableCreationResult {
+            return ValidateTableCreation(result)
+        })
     
-    // Put item
-    aws.DynamoDB().
-        Table("users").
-        PutItem().
-        WithAttribute("userId", "user123").
-        WithAttribute("name", "John Doe").
-        Execute().
-        Should().
-        Succeed()
+    // Create immutable item for insertion
+    userItem := NewFunctionalDynamoDBItem(
+        WithAttribute("userId", "user123"),
+        WithAttribute("name", "John Doe"),
+        WithAttribute("timestamp", time.Now().Unix()),
+    )
     
-    // Query items
-    aws.DynamoDB().
-        Table("users").
-        Query().
-        WhereKey("userId").
-        Equals("user123").
-        Limit(10).
-        Execute().
-        Should().
-        Succeed().
-        And().
-        ContainValue("user123")
+    // Put item functionally
+    putResult := tableCreationResult.FlatMap(func(_ TableCreationResult) mo.Result[PutItemResult] {
+        return PutFunctionalItem("users", userItem).
+            Map(func(result PutItemResult) PutItemResult {
+                return ValidateItemInsertion(result)
+            })
+    })
+    
+    // Create immutable query configuration
+    queryConfig := NewFunctionalQueryConfig(
+        WithTableName("users"),
+        WithKeyCondition("userId", "user123"),
+        WithLimit(10),
+        WithConsistentRead(true),
+    )
+    
+    // Execute query with function composition
+    queryResult := putResult.FlatMap(func(_ PutItemResult) mo.Result[QueryResult] {
+        return ExecuteFunctionalQuery(queryConfig).
+            Map(func(result QueryResult) QueryResult {
+                return ValidateQueryResults(result, "user123")
+            })
+    })
+    
+    // Assert all operations succeeded
+    queryResult.GetError().
+        Map(func(err error) error {
+            t.Errorf("DynamoDB operations failed: %v", err)
+            return err
+        }).
+        OrElse(func() {
+            t.Log("✓ All DynamoDB operations successful")
+        })
 }
 ```
 
-### S3 Bucket Management
+### Functional S3 Bucket Management
 
 ```go
-func TestS3Operations(t *testing.T) {
-    aws := NewAWS(t)
+func TestFunctionalS3Operations(t *testing.T) {
+    // Create immutable bucket configuration
+    bucketConfig := NewFunctionalS3BucketConfig(
+        WithBucketName("test-bucket-12345"),
+        WithRegion("us-west-2"),
+        WithVersioning(true),
+        WithEncryption(true),
+        WithPublicAccessBlocking(true),
+    )
     
-    // Create bucket
-    aws.S3().
-        CreateBucket().
-        Named("test-bucket-12345").
-        InRegion("us-west-2").
-        WithVersioning().
-        WithEncryption().
-        Create().
-        Should().
-        Succeed()
+    // Create bucket with monadic error handling
+    bucketCreationResult := CreateFunctionalS3Bucket(bucketConfig).
+        Map(func(result S3BucketCreationResult) S3BucketCreationResult {
+            return ValidateBucketCreation(result)
+        })
     
-    // Upload object
-    aws.S3().
-        Bucket("test-bucket-12345").
-        UploadObject().
-        WithKey("test/file.json").
-        WithBody(`{"message": "Hello World"}`).
-        WithContentType("application/json").
-        Execute().
-        Should().
-        Succeed()
+    // Create immutable object configuration
+    objectConfig := NewFunctionalS3ObjectConfig(
+        WithBucketName("test-bucket-12345"),
+        WithObjectKey("test/file.json"),
+        WithBody(`{"message": "Hello World"}`),
+        WithContentType("application/json"),
+        WithMetadata(map[string]string{
+            "created_by": "functional_test",
+            "version":    "1.0",
+        }),
+    )
+    
+    // Upload object with function composition
+    uploadResult := bucketCreationResult.FlatMap(func(_ S3BucketCreationResult) mo.Result[S3UploadResult] {
+        return UploadFunctionalS3Object(objectConfig).
+            Map(func(result S3UploadResult) S3UploadResult {
+                return ValidateObjectUpload(result)
+            })
+    })
+    
+    // Verify operations with monadic error handling
+    uploadResult.GetError().
+        Map(func(err error) error {
+            t.Errorf("S3 operations failed: %v", err)
+            return err
+        }).
+        OrElse(func() {
+            t.Log("✓ S3 bucket and object operations successful")
+        })
 }
 ```
 
 ## Supported AWS Services
 
-### Core Services
+### Functional AWS Services
 
-- **Lambda** - Function invocation, configuration management, log retrieval
-- **DynamoDB** - Table operations, item management, queries and scans
-- **S3** - Bucket management, object operations, versioning, CORS
-- **SES** - Email sending, identity verification, template management
-- **EventBridge** - Event buses, rules, event publishing, archives
-- **Step Functions** - State machines, executions, activities
-- **API Gateway** - REST APIs, resources, methods, deployments
+- **Lambda** - Immutable function configurations, monadic invocation results, type-safe payload handling
+- **DynamoDB** - Functional table operations, immutable item structures, composable query pipelines
+- **S3** - Immutable bucket configurations, type-safe object operations, functional metadata handling
+- **SES** - Functional email configurations, monadic sending results, immutable template management
+- **EventBridge** - Immutable event structures, functional rule configurations, composable event pipelines
+- **Step Functions** - Immutable state machine definitions, functional execution management, monadic result handling
+- **API Gateway** - Functional API configurations, immutable resource definitions, composable integration patterns
 
 ### Service Features
 
-#### Lambda
-- Synchronous and asynchronous invocations
-- JSON payload handling
-- Version and alias management
-- CloudWatch log integration
-- Configuration updates
+#### Functional Lambda
+- Immutable invocation configurations with functional options
+- Type-safe JSON payload handling using Go generics
+- Monadic result handling for synchronous/asynchronous operations
+- Functional CloudWatch log integration with `mo.Option[T]`
+- Zero-mutation configuration updates using functional transformations
 
-#### DynamoDB
-- Table creation and management
-- Put, get, query, scan operations
-- Conditional expressions
-- Consistent reads
-- Parallel scanning
+#### Functional DynamoDB  
+- Immutable table configurations with functional options pattern
+- Type-safe CRUD operations using `lo.Map` and `lo.Filter`
+- Functional conditional expressions with monadic validation
+- Consistent read configurations using `mo.Option[T]`
+- Composable parallel scanning with `lo.Reduce` aggregation
 
-#### S3
-- Bucket creation and configuration
-- Object upload/download
-- Versioning and lifecycle management
-- CORS configuration
-- Presigned URL generation
+#### Functional S3
+- Immutable bucket configurations with functional options
+- Type-safe object operations using Go generics
+- Functional versioning and lifecycle management
+- Immutable CORS configuration structures
+- Monadic presigned URL generation with error handling
 
 #### SES
 - Email sending with templates

@@ -1,53 +1,70 @@
-# DynamoDB Testing Package
+# 📊 DynamoDB Functional Testing Package  
 
-A comprehensive AWS DynamoDB testing package for the `vasdeference` module that follows strict Terratest patterns. This package provides complete DynamoDB operations with automatic retry logic, comprehensive test assertions, and utilities for building robust integration tests.
+A **pure functional programming** DynamoDB testing package built with immutable data structures, monadic error handling, and type-safe operations using `samber/lo` and `samber/mo`.
 
-## Features
+## ✨ Functional Programming Features
 
-### Core DynamoDB Operations
-- **CRUD Operations**: PutItem, GetItem, UpdateItem, DeleteItem with full options support
-- **Query & Scan**: With pagination, filtering, and projection expressions
-- **Batch Operations**: BatchWriteItem, BatchGetItem with automatic retry and exponential backoff
-- **Transactions**: TransactWriteItems, TransactGetItems for ACID compliance
-- **Table Management**: CreateTable, DeleteTable, DescribeTable, UpdateTable with full lifecycle support
+🔒 **Type-Safe Operations** with Go generics for AttributeValue handling  
+🚀 **Immutable Items** with functional builders and transformations  
+📦 **Pure Function Pipeline** for table operations and validation  
+⚡ **Monadic Error Handling** with safe operations and no null pointers  
+🔧 **Functional Composition** for complex query and batch operations  
+🧮 **Mathematical Precision** - predictable, verifiable database operations  
 
-### Test Infrastructure
-- **Terratest Patterns**: All functions follow `Function/FunctionE` pattern for proper error handling
-- **Comprehensive Assertions**: Pre-built assertions for common testing scenarios
-- **Automatic Retries**: Built-in exponential backoff for batch operations and table state changes
-- **Test Isolation**: Utilities for backing up and restoring table data between tests
+## 🏗️ Architecture
 
-### Advanced Features
-- **GSI/LSI Management**: Create, update, and manage Global and Local Secondary Indexes
-- **Stream Processing**: Helpers for working with DynamoDB Streams
-- **Point-in-time Recovery**: Backup and restore capabilities for test isolation
-- **Conditional Operations**: Full support for condition expressions and atomic operations
+### Pure Functional Operations
+- **Zero Mutations**: All operations return new immutable data structures
+- **Monadic Types**: `Option[T]` and `Result[T]` for safe error handling
+- **Function Composition**: Chain operations with mathematical precision
+- **Type Safety**: Compile-time guarantees for AttributeValue operations
+- **Immutable Items**: Functional builders with method chaining
 
-## Installation
+### Advanced Functional Features  
+- **Pipeline Operations**: Compose CRUD operations into functional pipelines
+- **Batch Processing**: Immutable batch operations with automatic retry
+- **Query Composition**: Functional query builders with expression safety
+- **Transaction Support**: ACID-compliant operations with monadic results
 
-```bash
-go get vasdeference/dynamodb
-```
-
-## Quick Start
+## 🚀 Quick Start
 
 ```go
-package main
-
 import (
-    "testing"
-    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
     "vasdeference/dynamodb"
+    "github.com/samber/mo"
 )
 
-func TestBasicOperations(t *testing.T) {
-    tableName := "users"
+func TestFunctionalDynamoDB(t *testing.T) {
+    // Immutable table configuration with functional options
+    config := NewFunctionalDynamoDBConfig("users",
+        WithConsistentRead(true),
+        WithBillingMode(types.BillingModePayPerRequest),
+        WithDynamoDBTimeout(30*time.Second),
+        WithDynamoDBMetadata("purpose", "user_storage"),
+    )
     
-    // Create an item
-    item := map[string]types.AttributeValue{
-        "id":   &types.AttributeValueMemberS{Value: "user-123"},
-        "name": &types.AttributeValueMemberS{Value: "John Doe"},
-        "age":  &types.AttributeValueMemberN{Value: "30"},
+    // Create table with monadic result
+    createResult := SimulateFunctionalDynamoDBCreateTable(config)
+    require.True(t, createResult.IsSuccess())
+    
+    // Build immutable item with functional composition
+    user := NewFunctionalDynamoDBItem().
+        WithAttribute("userId", "user-123").
+        WithAttribute("email", "user@example.com").
+        WithAttribute("status", "active").
+        WithAttribute("createdAt", time.Now().Unix())
+    
+    // Put item with safe error handling
+    putResult := SimulateFunctionalDynamoDBPutItem(user, config)
+    putResult.GetError().
+        Map(func(err error) error {
+            t.Errorf("Put failed: %v", err)
+            return err
+        }).
+        OrElse(func() {
+            t.Log("✓ Item stored successfully")
+        })
+}
     }
     
     dynamodb.PutItem(t, tableName, item)

@@ -1,53 +1,76 @@
-# AWS Lambda Testing Package
+# 🚀 AWS Lambda Functional Testing Package
 
-A comprehensive AWS Lambda testing package for the `vasdeference` module that follows strict Terratest patterns from Gruntwork. This package provides a drop-in replacement for Terratest's Lambda utilities with enhanced serverless-specific features and functional programming principles.
+A **pure functional programming** AWS Lambda testing package for the `vasdeference` framework. Built with immutable data structures, monadic error handling, and type-safe operations using `samber/lo` and `samber/mo`.
 
-## Overview
+## ✨ Functional Programming Features
 
-This package is designed to make testing AWS Lambda functions and serverless workflows easier, more reliable, and more maintainable. It follows Terratest's proven patterns while adding serverless-specific conveniences and comprehensive event handling.
+🔒 **Type-Safe Operations** with Go generics and monadic types  
+🚀 **Pure Functions** with no mutations or side effects  
+📦 **Immutable Configurations** using functional options pattern  
+⚡ **Monadic Error Handling** with `Option[T]` and `Result[T]`  
+🔧 **Function Composition** with chainable operations  
+🧮 **Mathematical Precision** - predictable, verifiable, composable  
 
-## Key Features
+## 🏗️ Architecture
 
-- **Terratest Patterns**: All functions follow Terratest's `Function` and `FunctionE` patterns
-- **Functional Programming**: Pure functional programming principles with Go idioms
-- **Comprehensive AWS Lambda SDK v2 Integration**: Full wrapping of AWS Lambda functionality
-- **Table-Driven Test Support**: Playwright-like syntax sugar for testing workflows
-- **Intelligent Retry Mechanisms**: Built-in retry logic for eventual consistency
-- **Event Source Mapping Support**: Complete event source mapping lifecycle management
-- **CloudWatch Logs Integration**: Log retrieval, parsing, and validation utilities
-- **Environment Variable Management**: Safe environment variable testing and validation
-- **JSON Payload Helpers**: Marshaling/unmarshaling utilities with validation
-- **Event Pattern Builders**: Pre-built event patterns for S3, DynamoDB, SQS, SNS, API Gateway
-- **Performance Testing Support**: Concurrency and load testing utilities
-- **Comprehensive Assertions**: Rich assertion library for Lambda-specific validations
+- **Pure Functional Core**: All functions are pure with predictable inputs/outputs
+- **Immutable Data Structures**: Zero mutations, only transformations
+- **Monadic Operations**: Safe error handling without exceptions
+- **Type Safety**: Compile-time guarantees with Go generics
+- **Function Composition**: Elegant pipelines for complex operations
+- **Zero Side Effects**: All effects isolated to result types
 
-## Core Functions
+## 🔧 Functional Operations
 
-### Lambda Invocation
-- `Invoke/InvokeE` - Synchronous Lambda invocations
-- `InvokeAsync/InvokeAsyncE` - Asynchronous Lambda invocations  
-- `InvokeWithRetry/InvokeWithRetryE` - Retry logic for invocations
-- `DryRunInvoke/DryRunInvokeE` - Dry run invocations for validation
+### Pure Lambda Functions
+```go
+// Immutable configuration with functional options
+config := NewFunctionalLambdaConfig(
+    WithFunctionName("my-processor"),
+    WithRuntime("nodejs22.x"),
+    WithTimeout(30*time.Second),
+    WithMemorySize(512),
+)
 
-### Function Management
-- `GetFunction/GetFunctionE` - Function configuration retrieval
-- `CreateFunction/CreateFunctionE` - Function creation
-- `UpdateFunction/UpdateFunctionE` - Function code/configuration updates
-- `DeleteFunction/DeleteFunctionE` - Function deletion
-- `ListFunctions/ListFunctionsE` - List all functions
-- `FunctionExists/FunctionExistsE` - Check function existence
-- `WaitForFunctionActive/WaitForFunctionActiveE` - Wait for function state
+// Type-safe function creation with monadic result
+result := SimulateFunctionalLambdaCreateFunction(config)
+if result.IsSuccess() {
+    t.Log("✓ Function created successfully")
+}
+```
 
-### Environment Variables
-- `GetEnvVar/GetEnvVarE` - Environment variable retrieval
-- `AssertEnvVarEquals` - Environment variable assertions
-- `AssertEnvVarExists/AssertEnvVarDoesNotExist` - Environment variable existence checks
+### Monadic Invocation Operations
+```go
+// Immutable invocation payload
+payload := NewFunctionalLambdaInvocationPayload(`{"test": "data"}`)
 
-### CloudWatch Logs
-- `GetLogs/GetLogsE` - CloudWatch log retrieval and parsing
-- `GetRecentLogs/GetRecentLogsE` - Recent log retrieval
-- `WaitForLogs/WaitForLogsE` - Wait for specific log patterns
-- `FilterLogs/FilterLogsByLevel` - Log filtering utilities
+// Invoke with functional composition
+invokeResult := SimulateFunctionalLambdaInvoke(payload, config)
+
+// Safe monadic error handling
+invokeResult.GetError().
+    Map(func(err error) error {
+        t.Errorf("Invocation failed: %v", err)
+        return err
+    }).
+    OrElse(func() {
+        t.Log("✓ Lambda invoked successfully")
+    })
+```
+
+### Function Composition Pipeline
+```go
+// Compose multiple operations into a pipeline
+pipeline := ComposeSimulationOperations(
+    CreateFunctionOperation(config),
+    InvokeFunctionOperation(payload),
+    ValidateResponseOperation(),
+    CleanupResourcesOperation(),
+)
+
+// Execute pipeline with single result
+pipelineResult := ExecuteFunctionalLambdaPipeline(pipeline)
+```
 - `GetLogStats` - Log statistics and analysis
 
 ### Event Source Mappings
