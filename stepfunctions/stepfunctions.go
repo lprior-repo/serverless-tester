@@ -93,6 +93,13 @@ var (
 	ErrExecutionFailed         = errors.New("execution failed")
 	ErrInvalidInput            = errors.New("invalid input")
 	ErrInvalidArn              = errors.New("invalid ARN")
+	ErrActivityNotFound        = errors.New("activity not found")
+	ErrInvalidActivityName     = errors.New("invalid activity name")
+	ErrTaskTokenRequired       = errors.New("task token is required")
+	ErrInvalidTaskToken        = errors.New("invalid task token")
+	ErrTaskTokenNotFound       = errors.New("task token not found")
+	ErrMapRunNotFound          = errors.New("map run not found")
+	ErrInvalidMapRunArn        = errors.New("invalid map run ARN")
 )
 
 // TestingT provides interface compatibility with testing frameworks
@@ -155,6 +162,58 @@ type ExecutionResult struct {
 	MapRunArn        string
 	RedriveCount     int
 	RedriveDate      time.Time
+}
+
+// ActivityInfo contains information about a Step Functions activity
+type ActivityInfo struct {
+	ActivityArn  string
+	Name         string
+	CreationDate time.Time
+	Tags         map[string]string
+}
+
+// ActivityTask represents a task retrieved from an activity
+type ActivityTask struct {
+	TaskToken string
+	Input     string
+}
+
+// TaskResult represents the result of a completed task
+type TaskResult struct {
+	TaskToken string
+	Output    string
+	Error     string
+	Cause     string
+}
+
+// MapRunInfo contains information about a map run
+type MapRunInfo struct {
+	MapRunArn           string
+	ExecutionArn        string
+	Status              types.MapRunStatus
+	StartDate           time.Time
+	StopDate            time.Time
+	MaxConcurrency      int32
+	ToleratedFailurePercentage float64
+	ToleratedFailureCount      int64
+	ExecutionCounts     map[string]int64
+}
+
+// SyncExecutionResult contains the response from a synchronous execution
+type SyncExecutionResult struct {
+	ExecutionArn   string
+	StateMachineArn string
+	Name           string
+	Status         types.SyncExecutionStatus
+	StartDate      time.Time
+	StopDate       time.Time
+	Input          string
+	Output         string
+	Error          string
+	Cause          string
+	ExecutionTime  time.Duration
+	BillingDetails *types.BillingDetails
+	TraceHeader    string
 }
 
 // HistoryEvent represents a Step Functions execution history event
@@ -1124,6 +1183,82 @@ func defaultPollConfig() *PollConfig {
 	}
 }
 
+// Activity validation functions
+
+// validateActivityName validates that the activity name follows AWS naming conventions
+func validateActivityName(activityName string) error {
+	if activityName == "" {
+		return ErrInvalidActivityName
+	}
+	
+	if len(activityName) > 80 {
+		return fmt.Errorf("%w: name too long (%d characters)", ErrInvalidActivityName, len(activityName))
+	}
+	
+	// Activity names must match pattern: [a-zA-Z0-9-_]+
+	matched, err := regexp.MatchString(`^[a-zA-Z0-9-_]+$`, activityName)
+	if err != nil {
+		return fmt.Errorf("%w: regex validation failed: %v", ErrInvalidActivityName, err)
+	}
+	
+	if !matched {
+		return fmt.Errorf("%w: name contains invalid characters", ErrInvalidActivityName)
+	}
+	
+	return nil
+}
+
+// validateActivityArn validates that the activity ARN is valid
+func validateActivityArn(activityArn string) error {
+	if activityArn == "" {
+		return fmt.Errorf("activity ARN is required")
+	}
+	
+	// Basic ARN format validation
+	if !strings.HasPrefix(activityArn, "arn:aws:states:") {
+		return fmt.Errorf("%w: must start with 'arn:aws:states:'", ErrInvalidArn)
+	}
+	
+	if !strings.Contains(activityArn, ":activity:") {
+		return fmt.Errorf("%w: must contain ':activity:'", ErrInvalidArn)
+	}
+	
+	return nil
+}
+
+// validateTaskToken validates that the task token is valid
+func validateTaskToken(taskToken string) error {
+	if taskToken == "" {
+		return ErrTaskTokenRequired
+	}
+	
+	// Task tokens are typically UUID-like strings with specific format
+	if len(taskToken) < 10 {
+		return fmt.Errorf("%w: token too short", ErrInvalidTaskToken)
+	}
+	
+	return nil
+}
+
+// validateMapRunArn validates that the map run ARN is valid
+func validateMapRunArn(mapRunArn string) error {
+	if mapRunArn == "" {
+		return fmt.Errorf("map run ARN is required")
+	}
+	
+	// Basic ARN format validation
+	if !strings.HasPrefix(mapRunArn, "arn:aws:states:") {
+		return fmt.Errorf("%w: must start with 'arn:aws:states:'", ErrInvalidMapRunArn)
+	}
+	
+	if !strings.Contains(mapRunArn, ":mapRun:") {
+		return fmt.Errorf("%w: must contain ':mapRun:'", ErrInvalidMapRunArn)
+	}
+	
+	return nil
+}
+
+
 // mergePollConfig merges user config with defaults
 func mergePollConfig(userConfig *PollConfig) *PollConfig {
 	defaults := defaultPollConfig()
@@ -1152,4 +1287,206 @@ func mergePollConfig(userConfig *PollConfig) *PollConfig {
 	}
 	
 	return &merged
+}
+
+// ParallelExecution represents a single execution request for parallel processing
+type ParallelExecution struct {
+	StateMachineArn string
+	ExecutionName   string
+	Input          *Input
+	TraceHeader    string
+}
+
+// ParallelExecutionConfig configures parallel execution behavior
+type ParallelExecutionConfig struct {
+	MaxConcurrency    int
+	Timeout          time.Duration
+	WaitForCompletion bool
+	FailFast         bool
+}
+
+// ParallelExecutionResult contains results from parallel execution
+type ParallelExecutionResult struct {
+	Execution *ParallelExecution
+	Result    *ExecutionResult
+	Error     error
+}
+
+// Batch Operations Types
+
+// BatchOperationConfig configures batch operation behavior
+type BatchOperationConfig struct {
+	MaxConcurrency int
+	Timeout        time.Duration
+	FailFast       bool
+}
+
+// BatchExecutionRequest represents a single execution request for batch processing
+type BatchExecutionRequest struct {
+	StateMachineArn string
+	ExecutionName   string
+	Input          *Input
+	TraceHeader    string
+}
+
+// BatchTagOperation represents a single tag operation for batch processing
+type BatchTagOperation struct {
+	StateMachineArn string
+	Tags           map[string]string
+}
+
+// BatchStateMachineResult contains results from batch state machine operations
+type BatchStateMachineResult struct {
+	StateMachine    *StateMachineInfo
+	StateMachineArn string
+	Error          error
+}
+
+// BatchExecutionResult contains results from batch execution operations
+type BatchExecutionResult struct {
+	Execution    *ExecutionResult
+	ExecutionArn string
+	Error       error
+}
+
+// BatchTagResult contains results from batch tag operations
+type BatchTagResult struct {
+	StateMachineArn string
+	Tags           map[string]string
+	Error          error
+}
+
+// Execution Pool Types
+
+// ExecutionPoolStatus represents the status of a pool execution
+type ExecutionPoolStatus string
+
+const (
+	PoolExecutionStatusQueued    ExecutionPoolStatus = "QUEUED"
+	PoolExecutionStatusRunning   ExecutionPoolStatus = "RUNNING"
+	PoolExecutionStatusCompleted ExecutionPoolStatus = "COMPLETED"
+	PoolExecutionStatusFailed    ExecutionPoolStatus = "FAILED"
+	PoolExecutionStatusTimeout   ExecutionPoolStatus = "TIMEOUT"
+	PoolExecutionStatusCancelled ExecutionPoolStatus = "CANCELLED"
+)
+
+// ExecutionPoolConfig configures execution pool behavior
+type ExecutionPoolConfig struct {
+	MaxConcurrentExecutions int
+	MaxQueueSize           int
+	ExecutionTimeout       time.Duration
+	PoolTimeout           time.Duration
+}
+
+// ExecutionRequest represents a request to execute a Step Function
+type ExecutionRequest struct {
+	StateMachineArn string
+	ExecutionName   string
+	Input          *Input
+	TraceHeader    string
+	Priority       int // Higher numbers = higher priority
+}
+
+// PoolExecutionResult contains the result of submitting an execution to the pool
+type PoolExecutionResult struct {
+	ExecutionID   string
+	Status        ExecutionPoolStatus
+	SubmittedAt   time.Time
+	StartedAt     time.Time
+	CompletedAt   time.Time
+	ExecutionArn  string
+	Error         error
+	Result        *ExecutionResult
+	
+	// Private field for internal use
+	request       ExecutionRequest
+}
+
+// ExecutionPoolStats provides statistics about the execution pool
+type ExecutionPoolStats struct {
+	TotalSubmitted         int
+	RunningExecutions      int
+	QueuedExecutions       int
+	CompletedExecutions    int
+	FailedExecutions       int
+	CancelledExecutions    int
+	MaxConcurrentExecutions int
+	MaxQueueSize          int
+	AverageExecutionTime  time.Duration
+}
+
+// Workflow Chain Types
+
+// DependencyMode defines how dependencies are evaluated
+type DependencyMode string
+
+const (
+	DependencyModeAll DependencyMode = "ALL" // Wait for all dependencies to complete
+	DependencyModeAny DependencyMode = "ANY" // Wait for any dependency to complete
+)
+
+// WorkflowChainConfig configures workflow chain execution behavior
+type WorkflowChainConfig struct {
+	Timeout          time.Duration
+	MaxParallelSteps int
+	FailFast         bool
+}
+
+// WorkflowCondition defines conditional execution logic
+type WorkflowCondition struct {
+	Expression string // Template expression that evaluates to true/false
+}
+
+// WorkflowRetryConfig configures retry behavior for workflow steps
+type WorkflowRetryConfig struct {
+	MaxAttempts       int
+	InitialInterval   time.Duration
+	BackoffMultiplier float64
+	MaxInterval       time.Duration
+}
+
+// WorkflowStep represents a single step in a workflow chain
+type WorkflowStep struct {
+	Name            string
+	StateMachineArn string
+	Input           *Input
+	TraceHeader     string
+	Dependencies    []string
+	DependencyMode  DependencyMode
+	Condition       *WorkflowCondition
+	RetryConfig     *WorkflowRetryConfig
+}
+
+// WorkflowStepResult contains the result of executing a workflow step
+type WorkflowStepResult struct {
+	Step         *WorkflowStep
+	Result       *ExecutionResult
+	Error        error
+	StartedAt    time.Time
+	CompletedAt  time.Time
+	AttemptCount int
+	Skipped      bool
+}
+
+// WorkflowChainResult contains the result of executing a workflow chain
+type WorkflowChainResult struct {
+	StepResults []WorkflowStepResult
+	Stats       *WorkflowChainStats
+	StartedAt   time.Time
+	CompletedAt time.Time
+}
+
+// WorkflowChainStats provides statistics about workflow chain execution
+type WorkflowChainStats struct {
+	TotalSteps     int
+	ExecutedSteps  int
+	FailedSteps    int
+	SkippedSteps   int
+	ExecutionTime  time.Duration
+}
+
+// WorkflowChain represents a collection of workflow steps with dependencies
+type WorkflowChain struct {
+	steps     []*WorkflowStep
+	stepIndex map[string]int
 }

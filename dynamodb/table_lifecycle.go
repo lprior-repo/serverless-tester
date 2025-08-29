@@ -11,7 +11,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/gruntwork-io/terratest/modules/retry"
 	"github.com/stretchr/testify/require"
+	
+	vasdeferns "vasdeference"
 )
+
+// TestContext alias for consistent API across all AWS service packages
+type TestContext = vasdeferns.TestContext
 
 // CreateTableOptions contains optional parameters for CreateTable operations
 type CreateTableOptions struct {
@@ -62,26 +67,26 @@ type TableDescription struct {
 }
 
 // CreateTable creates a new DynamoDB table and fails the test if an error occurs
-func CreateTable(t *testing.T, tableName string, keySchema []types.KeySchemaElement, attributeDefinitions []types.AttributeDefinition) *TableDescription {
+func CreateTable(ctx *TestContext, tableName string, keySchema []types.KeySchemaElement, attributeDefinitions []types.AttributeDefinition) *TableDescription {
 	result, err := CreateTableE(t, tableName, keySchema, attributeDefinitions)
-	require.NoError(t, err)
+	require.NoError(ctx.T, err)
 	return result
 }
 
 // CreateTableE creates a new DynamoDB table and returns the table description and any error
-func CreateTableE(t *testing.T, tableName string, keySchema []types.KeySchemaElement, attributeDefinitions []types.AttributeDefinition) (*TableDescription, error) {
+func CreateTableE(ctx *TestContext, tableName string, keySchema []types.KeySchemaElement, attributeDefinitions []types.AttributeDefinition) (*TableDescription, error) {
 	return CreateTableWithOptionsE(t, tableName, keySchema, attributeDefinitions, CreateTableOptions{})
 }
 
 // CreateTableWithOptions creates a new DynamoDB table with options and fails the test if an error occurs
-func CreateTableWithOptions(t *testing.T, tableName string, keySchema []types.KeySchemaElement, attributeDefinitions []types.AttributeDefinition, options CreateTableOptions) *TableDescription {
+func CreateTableWithOptions(ctx *TestContext, tableName string, keySchema []types.KeySchemaElement, attributeDefinitions []types.AttributeDefinition, options CreateTableOptions) *TableDescription {
 	result, err := CreateTableWithOptionsE(t, tableName, keySchema, attributeDefinitions, options)
-	require.NoError(t, err)
+	require.NoError(ctx.T, err)
 	return result
 }
 
 // CreateTableWithOptionsE creates a new DynamoDB table with options and returns the table description and any error
-func CreateTableWithOptionsE(t *testing.T, tableName string, keySchema []types.KeySchemaElement, attributeDefinitions []types.AttributeDefinition, options CreateTableOptions) (*TableDescription, error) {
+func CreateTableWithOptionsE(ctx *TestContext, tableName string, keySchema []types.KeySchemaElement, attributeDefinitions []types.AttributeDefinition, options CreateTableOptions) (*TableDescription, error) {
 	client, err := createDynamoDBClient()
 	if err != nil {
 		return nil, err
@@ -143,13 +148,13 @@ func CreateTableWithOptionsE(t *testing.T, tableName string, keySchema []types.K
 }
 
 // DeleteTable deletes a DynamoDB table and fails the test if an error occurs
-func DeleteTable(t *testing.T, tableName string) {
+func DeleteTable(ctx *TestContext, tableName string) {
 	err := DeleteTableE(t, tableName)
-	require.NoError(t, err)
+	require.NoError(ctx.T, err)
 }
 
 // DeleteTableE deletes a DynamoDB table and returns any error
-func DeleteTableE(t *testing.T, tableName string) error {
+func DeleteTableE(ctx *TestContext, tableName string) error {
 	client, err := createDynamoDBClient()
 	if err != nil {
 		return err
@@ -163,14 +168,14 @@ func DeleteTableE(t *testing.T, tableName string) error {
 }
 
 // DescribeTable gets information about a DynamoDB table and fails the test if an error occurs
-func DescribeTable(t *testing.T, tableName string) *TableDescription {
+func DescribeTable(ctx *TestContext, tableName string) *TableDescription {
 	result, err := DescribeTableE(t, tableName)
-	require.NoError(t, err)
+	require.NoError(ctx.T, err)
 	return result
 }
 
 // DescribeTableE gets information about a DynamoDB table and returns the table description and any error
-func DescribeTableE(t *testing.T, tableName string) (*TableDescription, error) {
+func DescribeTableE(ctx *TestContext, tableName string) (*TableDescription, error) {
 	client, err := createDynamoDBClient()
 	if err != nil {
 		return nil, err
@@ -187,14 +192,14 @@ func DescribeTableE(t *testing.T, tableName string) (*TableDescription, error) {
 }
 
 // UpdateTable modifies a DynamoDB table and fails the test if an error occurs
-func UpdateTable(t *testing.T, tableName string, options UpdateTableOptions) *TableDescription {
+func UpdateTable(ctx *TestContext, tableName string, options UpdateTableOptions) *TableDescription {
 	result, err := UpdateTableE(t, tableName, options)
-	require.NoError(t, err)
+	require.NoError(ctx.T, err)
 	return result
 }
 
 // UpdateTableE modifies a DynamoDB table and returns the table description and any error
-func UpdateTableE(t *testing.T, tableName string, options UpdateTableOptions) (*TableDescription, error) {
+func UpdateTableE(ctx *TestContext, tableName string, options UpdateTableOptions) (*TableDescription, error) {
 	client, err := createDynamoDBClient()
 	if err != nil {
 		return nil, err
@@ -241,13 +246,13 @@ func UpdateTableE(t *testing.T, tableName string, options UpdateTableOptions) (*
 }
 
 // WaitForTable waits for a table to reach the specified status and fails the test if an error occurs
-func WaitForTable(t *testing.T, tableName string, expectedStatus types.TableStatus, timeout time.Duration) {
+func WaitForTable(ctx *TestContext, tableName string, expectedStatus types.TableStatus, timeout time.Duration) {
 	err := WaitForTableE(t, tableName, expectedStatus, timeout)
-	require.NoError(t, err)
+	require.NoError(ctx.T, err)
 }
 
 // WaitForTableE waits for a table to reach the specified status and returns any error
-func WaitForTableE(t *testing.T, tableName string, expectedStatus types.TableStatus, timeout time.Duration) error {
+func WaitForTableE(ctx *TestContext, tableName string, expectedStatus types.TableStatus, timeout time.Duration) error {
 	client, err := createDynamoDBClient()
 	if err != nil {
 		return err
@@ -293,18 +298,18 @@ func WaitForTableE(t *testing.T, tableName string, expectedStatus types.TableSta
 }
 
 // WaitForTableActive waits for a table to become active and fails the test if an error occurs
-func WaitForTableActive(t *testing.T, tableName string, timeout time.Duration) {
-	WaitForTable(t, tableName, types.TableStatusActive, timeout)
+func WaitForTableActive(ctx *TestContext, tableName string, timeout time.Duration) {
+	WaitForTable(ctx, tableName, types.TableStatusActive, timeout)
 }
 
 // WaitForTableDeleted waits for a table to be deleted and fails the test if an error occurs
-func WaitForTableDeleted(t *testing.T, tableName string, timeout time.Duration) {
+func WaitForTableDeleted(ctx *TestContext, tableName string, timeout time.Duration) {
 	err := WaitForTableDeletedE(t, tableName, timeout)
-	require.NoError(t, err)
+	require.NoError(ctx.T, err)
 }
 
 // WaitForTableDeletedE waits for a table to be deleted and returns any error
-func WaitForTableDeletedE(t *testing.T, tableName string, timeout time.Duration) error {
+func WaitForTableDeletedE(ctx *TestContext, tableName string, timeout time.Duration) error {
 	client, err := createDynamoDBClient()
 	if err != nil {
 		return err
@@ -339,14 +344,14 @@ func WaitForTableDeletedE(t *testing.T, tableName string, timeout time.Duration)
 }
 
 // ListTables lists all DynamoDB tables and fails the test if an error occurs
-func ListTables(t *testing.T) []string {
-	tables, err := ListTablesE(t)
-	require.NoError(t, err)
+func ListTables(ctx *TestContext) []string {
+	tables, err := ListTablesE(ctx)
+	require.NoError(ctx.T, err)
 	return tables
 }
 
 // ListTablesE lists all DynamoDB tables and returns the table names and any error
-func ListTablesE(t *testing.T) ([]string, error) {
+func ListTablesE(ctx *TestContext) ([]string, error) {
 	client, err := createDynamoDBClient()
 	if err != nil {
 		return nil, err

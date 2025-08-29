@@ -1,0 +1,376 @@
+{
+  "name": "sfx-serverless-testing",
+  "displayName": "SFX - Serverless Framework eXtended",
+  "description": "Comprehensive serverless testing with AWS integration, syntax highlighting, and intelligent code completion",
+  "version": "1.0.0",
+  "publisher": "sfx-team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sfx-team/vscode-extension"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Testing",
+    "AWS",
+    "Serverless",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "aws",
+    "lambda",
+    "dynamodb",
+    "eventbridge",
+    "stepfunctions",
+    "serverless",
+    "testing",
+    "terratest"
+  ],
+  "activationEvents": [
+    "onLanguage:go",
+    "onCommand:sfx.test.run",
+    "onCommand:sfx.generate.test",
+    "workspaceContains:**/*_test.go",
+    "workspaceContains:**/go.mod"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "sfx-test",
+        "aliases": [
+          "SFX Test",
+          "sfx-test"
+        ],
+        "extensions": [
+          ".sfx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "sfx-test",
+        "scopeName": "source.sfx",
+        "path": "./syntaxes/sfx.tmLanguage.json"
+      },
+      {
+        "scopeName": "injection.go.sfx",
+        "path": "./syntaxes/go-sfx-injection.json",
+        "injectTo": [
+          "source.go"
+        ]
+      }
+    ],
+    "themes": [
+      {
+        "label": "SFX Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/sfx-dark.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "sfx.test.run",
+        "title": "Run Tests",
+        "category": "SFX",
+        "icon": "$(play)"
+      },
+      {
+        "command": "sfx.test.runFile",
+        "title": "Run Tests in File",
+        "category": "SFX",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "sfx.test.runSingle",
+        "title": "Run Single Test",
+        "category": "SFX",
+        "icon": "$(run)"
+      },
+      {
+        "command": "sfx.test.debug",
+        "title": "Debug Test",
+        "category": "SFX",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "sfx.generate.test",
+        "title": "Generate Test",
+        "category": "SFX",
+        "icon": "$(add)"
+      },
+      {
+        "command": "sfx.generate.scaffold",
+        "title": "Scaffold Test Suite",
+        "category": "SFX",
+        "icon": "$(folder-library)"
+      },
+      {
+        "command": "sfx.coverage.show",
+        "title": "Show Coverage",
+        "category": "SFX",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "sfx.benchmark.run",
+        "title": "Run Benchmarks",
+        "category": "SFX",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "sfx.logs.analyze",
+        "title": "Analyze Logs",
+        "category": "SFX",
+        "icon": "$(search)"
+      },
+      {
+        "command": "sfx.trace.analyze",
+        "title": "Analyze X-Ray Traces",
+        "category": "SFX",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "sfx.config.validate",
+        "title": "Validate Configuration",
+        "category": "SFX",
+        "icon": "$(check)"
+      },
+      {
+        "command": "sfx.doctor",
+        "title": "Run SFX Doctor",
+        "category": "SFX",
+        "icon": "$(pulse)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "sfx.test.run",
+          "when": "resourceLangId == go"
+        },
+        {
+          "command": "sfx.test.runFile",
+          "when": "resourceLangId == go && resourceExtname == .go"
+        },
+        {
+          "command": "sfx.test.runSingle",
+          "when": "resourceLangId == go && editorHasSelection"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "sfx.test.runSingle",
+          "when": "resourceLangId == go && editorHasSelection",
+          "group": "sfx@1"
+        },
+        {
+          "command": "sfx.test.debug",
+          "when": "resourceLangId == go && editorHasSelection",
+          "group": "sfx@2"
+        },
+        {
+          "command": "sfx.generate.test",
+          "when": "resourceLangId == go",
+          "group": "sfx@3"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "sfx.test.runFile",
+          "when": "resourceLangId == go && resourceFilename =~ /.*_test\\.go$/",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "sfx.generate.test",
+          "when": "resourceLangId == go",
+          "group": "sfx@1"
+        },
+        {
+          "command": "sfx.generate.scaffold",
+          "when": "explorerResourceIsFolder",
+          "group": "sfx@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "sfx.test.run",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "resourceLangId == go"
+      },
+      {
+        "command": "sfx.test.runFile",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "resourceLangId == go"
+      },
+      {
+        "command": "sfx.test.runSingle",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "resourceLangId == go && editorHasSelection"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "go",
+        "path": "./snippets/go-sfx.json"
+      }
+    ],
+    "configuration": {
+      "title": "SFX Configuration",
+      "properties": {
+        "sfx.cli.path": {
+          "type": "string",
+          "default": "sfx",
+          "description": "Path to the SFX CLI executable"
+        },
+        "sfx.aws.region": {
+          "type": "string",
+          "default": "us-east-1",
+          "description": "Default AWS region for testing"
+        },
+        "sfx.test.timeout": {
+          "type": "string",
+          "default": "300s",
+          "description": "Default test timeout"
+        },
+        "sfx.test.coverage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable coverage analysis by default"
+        },
+        "sfx.test.parallel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run tests in parallel"
+        },
+        "sfx.debug.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging"
+        },
+        "sfx.intellisense.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable intelligent code completion"
+        },
+        "sfx.autoGenerate.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-generate test templates on file creation"
+        },
+        "sfx.linting.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable SFX-specific linting rules"
+        }
+      }
+    },
+    "taskDefinitions": [
+      {
+        "type": "sfx",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "SFX command to run"
+          },
+          "args": {
+            "type": "array",
+            "description": "Command arguments"
+          }
+        }
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "sfxTestExplorer",
+          "name": "SFX Tests",
+          "when": "sfx:hasTests"
+        }
+      ],
+      "test": [
+        {
+          "id": "sfxCoverage",
+          "name": "SFX Coverage",
+          "when": "sfx:hasCoverage"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sfx",
+          "title": "SFX Testing",
+          "icon": "$(beaker)"
+        }
+      ]
+    },
+    "debuggers": [
+      {
+        "type": "sfx-debug",
+        "label": "SFX Debug",
+        "languages": [
+          "go"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Path to the test file"
+              },
+              "args": {
+                "type": "array",
+                "description": "Command line arguments"
+              },
+              "env": {
+                "type": "object",
+                "description": "Environment variables"
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Working directory"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4"
+  }
+}

@@ -20,7 +20,7 @@ const (
 
 // ARN validation regex patterns
 var (
-	arnRegex     = regexp.MustCompile(`^arn:aws:[\w-]+:[\w-]*:\d{12}:[\w\/-]+$`)
+	arnRegex     = regexp.MustCompile(`^arn:aws:[\w-]+:[\w-]*:\d{12}:[\w\/:.-]+$`)
 	jsonPathRegex = regexp.MustCompile(`^\$[.\[\]'":\w\-\*]*$`)
 )
 

@@ -2,78 +2,211 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 	
 	"vasdeference"
 	
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/samber/lo"
+	"github.com/samber/mo"
 )
 
-// ExampleBasicUsage demonstrates the basic usage of VasDeference
-func ExampleBasicUsage() {
-	fmt.Println("VasDeference basic usage patterns:")
+// ExampleFunctionalCoreUsage demonstrates the functional core usage patterns
+func ExampleFunctionalCoreUsage() {
+	fmt.Println("⚡ Functional Core Usage Patterns:")
 	
-	// Create VasDeference instance with automatic configuration
-	// vdf := vasdeference.New(t)
-	// defer vdf.Cleanup()
+	// Create immutable core configuration
+	config := vasdeference.NewFunctionalCoreConfig(
+		vasdeference.WithCoreRegion("us-east-1"),
+		vasdeference.WithCoreTimeout(30*time.Second),
+		vasdeference.WithCoreNamespace("functional-example"),
+		vasdeference.WithCoreMetrics(true),
+		vasdeference.WithCoreMetadata("environment", "test"),
+	)
 	
-	// Use the configured AWS clients
-	// lambdaClient := vdf.CreateLambdaClient()
-	// Expected: lambdaClient should not be nil
-	fmt.Println("Creating Lambda client with VasDeference configuration")
+	fmt.Printf("✅ Created immutable core configuration with region: %s\n", config.GetRegion())
+	fmt.Printf("✅ Configuration timeout: %v\n", config.GetTimeout())
+	fmt.Printf("✅ Configuration namespace: %s\n", config.GetNamespace().MustGet())
 	
-	// Use namespace for resource naming
-	// resourceName := vdf.PrefixResourceName("test-function")
-	// Expected: resourceName should contain "test-function"
-	fmt.Println("Prefixing resource name with namespace: test-function")
+	// Pure functional validation
+	validationResult := validateFunctionalCoreConfig(config)
+	validationResult.
+		Map(func(err error) error {
+			fmt.Printf("❌ Validation error: %v\n", err)
+			return err
+		}).
+		OrElse(func() {
+			fmt.Println("✅ Configuration validation passed")
+		})
 	
-	// Register cleanup for resources
-	// vdf.RegisterCleanup(func() error {
-	//     // Clean up your resources here
-	//     return nil
-	// })
-	fmt.Println("Registering cleanup functions for resource management")
-	fmt.Println("Basic usage completed")
+	// Function composition for complex operations
+	pipeline := lo.Pipe3(
+		createTestContext,
+		validateContext,
+		processContext,
+	)
+	
+	result := pipeline(config)
+	fmt.Printf("✅ Pipeline result: %+v\n", result)
+	fmt.Println("Functional core usage completed\n")
 }
 
-// ExampleWithCustomOptions demonstrates VasDeference with custom configuration
+// validateFunctionalCoreConfig is a pure function that validates configuration
+func validateFunctionalCoreConfig(config *vasdeference.FunctionalCoreConfig) mo.Option[error] {
+	if config.GetRegion() == "" {
+		return mo.Some[error](fmt.Errorf("region cannot be empty"))
+	}
+	if config.GetTimeout() <= 0 {
+		return mo.Some[error](fmt.Errorf("timeout must be positive"))
+	}
+	return mo.None[error]()
+}
+
+// Pure functions for pipeline composition
+func createTestContext(config *vasdeference.FunctionalCoreConfig) map[string]interface{} {
+	return map[string]interface{}{
+		"region":    config.GetRegion(),
+		"timeout":   config.GetTimeout(),
+		"namespace": config.GetNamespace().OrEmpty(),
+		"status":    "created",
+	}
+}
+
+func validateContext(context map[string]interface{}) map[string]interface{} {
+	context["validated"] = true
+	return context
+}
+
+func processContext(context map[string]interface{}) map[string]interface{} {
+	context["processed"] = true
+	context["timestamp"] = time.Now().Unix()
+	return context
+}
+
+// ExampleWithCustomOptions demonstrates functional configuration patterns
 func ExampleWithCustomOptions() {
-	fmt.Println("VasDeference custom configuration patterns:")
+	fmt.Println("⚙️ Functional Configuration Patterns:")
 	
-	// Create with custom options using NewTestContext
-	// ctx := vasdeference.NewTestContext(t)
-	// arrange := vasdeference.NewArrangeWithNamespace(ctx, "integration-test")
-	// defer arrange.Cleanup()
+	// Multiple configuration approaches with functional composition
+	baseConfig := vasdeference.NewFunctionalCoreConfig(
+		vasdeference.WithCoreRegion("us-west-2"),
+		vasdeference.WithCoreTimeout(60*time.Second),
+	)
 	
-	// Expected: arrange.Namespace should equal "integration-test"
-	fmt.Println("Creating VasDeference with custom namespace: integration-test")
-	fmt.Println("Custom configuration completed")
+	enhancedConfig := vasdeference.NewFunctionalCoreConfig(
+		vasdeference.WithCoreRegion("eu-west-1"),
+		vasdeference.WithCoreNamespace("integration-test"),
+		vasdeference.WithCoreMetrics(true),
+		vasdeference.WithCoreResilience(true),
+		vasdeference.WithCoreMetadata("environment", "staging"),
+		vasdeference.WithCoreMetadata("team", "platform"),
+	)
+	
+	fmt.Printf("✅ Base config: %s region, %v timeout\n", 
+		baseConfig.GetRegion(), baseConfig.GetTimeout())
+	fmt.Printf("✅ Enhanced config: %s region, namespace: %s\n", 
+		enhancedConfig.GetRegion(), enhancedConfig.GetNamespace().OrEmpty())
+	
+	// Demonstrate configuration validation with monads
+	validationResult := lo.Pipe2(
+		enhancedConfig,
+		validateFunctionalCoreConfig,
+		func(err mo.Option[error]) string {
+			return err.Map(func(e error) string {
+				return fmt.Sprintf("❌ Validation failed: %v", e)
+			}).OrElse("✅ Configuration is valid")
+		},
+	)
+	
+	fmt.Println(validationResult)
+	
+	// Use lo.Map to transform configuration options
+	options := []string{"logging", "metrics", "resilience"}
+	enabled := lo.Map(options, func(option string, _ int) map[string]bool {
+		switch option {
+		case "logging":
+			return map[string]bool{option: enhancedConfig.IsLoggingEnabled()}
+		case "metrics":
+			return map[string]bool{option: enhancedConfig.IsMetricsEnabled()}
+		case "resilience":
+			return map[string]bool{option: enhancedConfig.IsResilienceEnabled()}
+		default:
+			return map[string]bool{option: false}
+		}
+	})
+	
+	fmt.Printf("✅ Feature status: %+v\n", enabled)
+	fmt.Println("Functional configuration completed\n")
 }
 
-// ExampleTerraformIntegration demonstrates Terraform output integration
+// ExampleTerraformIntegration demonstrates functional Terraform output processing
 func ExampleTerraformIntegration() {
-	fmt.Println("VasDeference Terraform integration patterns:")
+	fmt.Println("🏗️ Functional Terraform Integration Patterns:")
 	
-	// vdf := vasdeference.New(t)
-	// defer vdf.Cleanup()
-	
-	// Simulate Terraform outputs
-	_ = /* outputs */ map[string]interface{}{
+	// Simulate Terraform outputs with immutable data
+	outputs := map[string]interface{}{
 		"lambda_function_name": "my-function-abc123",
 		"api_gateway_url":     "https://abc123.execute-api.us-east-1.amazonaws.com",
 		"dynamodb_table_name": "my-table-xyz789",
+		"region":              "us-east-1",
+		"environment":         "production",
 	}
 	
-	// Extract values safely
-	// functionName := vdf.GetTerraformOutput(outputs, "lambda_function_name")
-	// apiUrl := vdf.GetTerraformOutput(outputs, "api_gateway_url")
-	// tableName := vdf.GetTerraformOutput(outputs, "dynamodb_table_name")
+	// Type-safe extraction using monadic patterns
+	getTerraformOutput := func(key string) mo.Option[string] {
+		if val, exists := outputs[key]; exists {
+			if str, ok := val.(string); ok {
+				return mo.Some(str)
+			}
+		}
+		return mo.None[string]()
+	}
 	
-	// Expected outputs:
-	fmt.Printf("Function name: %s\n", outputs["lambda_function_name"])
-	fmt.Printf("API Gateway URL: %s\n", outputs["api_gateway_url"])
-	fmt.Printf("DynamoDB table: %s\n", outputs["dynamodb_table_name"])
-	fmt.Println("Terraform integration completed")
+	// Pure functional extraction and validation
+	resources := lo.MapEntries(outputs, func(key string, value interface{}) (string, mo.Option[string]) {
+		return key, getTerraformOutput(key)
+	})
+	
+	// Filter and process valid outputs
+	validResources := lo.PickByValues(resources, func(opt mo.Option[string]) bool {
+		return opt.IsPresent()
+	})
+	
+	fmt.Printf("✅ Valid resources found: %d\n", len(validResources))
+	
+	// Function composition for resource naming
+	resourceNamer := lo.Pipe2(
+		func(baseName string) string { return strings.TrimSuffix(baseName, "-abc123") },
+		func(name string) string { return fmt.Sprintf("validated-%s", name) },
+	)
+	
+	functionName := getTerraformOutput("lambda_function_name").
+		Map(resourceNamer).
+		OrElse("default-function")
+	
+	fmt.Printf("✅ Processed function name: %s\n", functionName)
+	
+	// Validate URLs using pure functions
+	validateURL := func(url string) mo.Option[error] {
+		if !strings.HasPrefix(url, "https://") {
+			return mo.Some[error](fmt.Errorf("URL must use HTTPS: %s", url))
+		}
+		return mo.None[error]()
+	}
+	
+	apiValidation := getTerraformOutput("api_gateway_url").
+		FlatMap(func(url string) mo.Option[string] {
+			return validateURL(url).Match(
+				func(err error) mo.Option[string] { return mo.None[string]() },
+				func() mo.Option[string] { return mo.Some(url) },
+			)
+		}).
+		OrElse("invalid-url")
+	
+	fmt.Printf("✅ API URL validation: %s\n", apiValidation)
+	fmt.Println("Functional Terraform integration completed\n")
 }
 
 // ExampleLambdaIntegration demonstrates integration with lambda package
@@ -188,7 +321,7 @@ func ExampleStepFunctionsIntegration() {
 	fmt.Println("Generating prefixed state machine name: test-state-machine")
 	
 	// This is how you would integrate with the stepfunctions package:
-	_ = /* definition */ `{
+	definition := `{
 	  "Comment": "A Hello World example",
 	  "StartAt": "HelloWorld",
 	  "States": {
@@ -215,112 +348,788 @@ func ExampleStepFunctionsIntegration() {
 	fmt.Println("Step Functions integration completed")
 }
 
-// ExampleRetryMechanism demonstrates using the retry functionality
+// ExampleRetryMechanism demonstrates functional retry patterns with monadic error handling
 func ExampleRetryMechanism() {
-	fmt.Println("VasDeference retry mechanism patterns:")
+	fmt.Println("🔄 Functional Retry Mechanism Patterns:")
 	
-	// ctx := vasdeference.NewTestContext(t)
-	// arrange := vasdeference.NewArrangeWithNamespace(ctx, "retry-test")
-	// defer arrange.Cleanup()
+	// Define operation result type
+	type OperationResult struct {
+		value    interface{}
+		attempts int
+		duration time.Duration
+	}
 	
-	_ = /* attempts */ 0
+	// Create retry strategies using immutable configuration
+	retryStrategies := []vasdeference.FunctionalRetryStrategy{
+		vasdeference.NewFunctionalRetryStrategy(3, 100*time.Millisecond),
+		vasdeference.NewFunctionalRetryStrategy(5, 200*time.Millisecond).
+			WithMaxDelay(2*time.Second).
+			WithMultiplier(1.5).
+			WithJitter(true),
+		vasdeference.NewFunctionalRetryStrategy(2, 50*time.Millisecond).
+			WithJitter(false).
+			WithRetryableErrors([]string{"timeout", "network error"}),
+	}
 	
-	// Simple retry logic implementation
-	for i := 0; i < 5; i++ {
-		attempts++
-		if attempts >= 3 {
-			break
+	fmt.Printf("✅ Created %d retry strategies\n", len(retryStrategies))
+	
+	// Pure retry function using generics and monads
+	type RetryableOperation[T any] func() (T, error)
+	
+	executeWithRetry := func[T any](operation RetryableOperation[T], strategy vasdeference.FunctionalRetryStrategy) mo.Result[T] {
+		var lastError error
+		var result T
+		
+		for attempt := 0; attempt < strategy.GetMaxRetries(); attempt++ {
+			if attempt > 0 {
+				// Calculate exponential backoff with jitter
+				baseDelay := strategy.GetBaseDelay()
+				multiplier := strategy.GetMultiplier()
+				delay := time.Duration(float64(baseDelay) * (multiplier * float64(attempt)))
+				
+				if delay > strategy.GetMaxDelay() {
+					delay = strategy.GetMaxDelay()
+				}
+				
+				if strategy.IsJitterEnabled() {
+					jitter := time.Duration(lo.RandomInt(0, int(delay.Milliseconds()/4))) * time.Millisecond
+					delay += jitter
+				}
+				
+				time.Sleep(delay)
+			}
+			
+			result, lastError = operation()
+			if lastError == nil {
+				return mo.Ok(result)
+			}
+			
+			// Check if error is retryable
+			errorMsg := strings.ToLower(lastError.Error())
+			retryable := lo.Some(strategy.GetRetryableErrors(), func(retryableErr string) bool {
+				return strings.Contains(errorMsg, strings.ToLower(retryableErr))
+			})
+			
+			if !retryable {
+				break
+			}
+		}
+		
+		return mo.Err[T](lastError)
+	}
+	
+	// Create test operations with different failure patterns
+	testOperations := []struct {
+		name        string
+		operation   RetryableOperation[string]
+		strategyIdx int
+	}{
+		{
+			name: "eventually-succeeds",
+			operation: func() func() (string, error) {
+				attemptCount := 0
+				return func() (string, error) {
+					attemptCount++
+					if attemptCount < 3 {
+						return "", fmt.Errorf("timeout occurred")
+					}
+					return fmt.Sprintf("success-after-%d-attempts", attemptCount), nil
+				}
+			}(),
+			strategyIdx: 0,
+		},
+		{
+			name: "always-fails-retryable",
+			operation: func() (string, error) {
+				return "", fmt.Errorf("network error: connection refused")
+			},
+			strategyIdx: 1,
+		},
+		{
+			name: "non-retryable-error",
+			operation: func() (string, error) {
+				return "", fmt.Errorf("validation error: invalid input")
+			},
+			strategyIdx: 2,
+		},
+	}
+	
+	// Execute operations with retry strategies using functional patterns
+	results := lo.Map(testOperations, func(test struct {
+		name        string
+		operation   RetryableOperation[string]
+		strategyIdx int
+	}, _ int) struct {
+		name   string
+		result mo.Result[string]
+	} {
+		strategy := retryStrategies[test.strategyIdx]
+		return struct {
+			name   string
+			result mo.Result[string]
+		}{
+			name:   test.name,
+			result: executeWithRetry(test.operation, strategy),
+		}
+	})
+	
+	// Process results using monadic operations
+	successCount := lo.CountBy(results, func(result struct {
+		name   string
+		result mo.Result[string]
+	}) bool {
+		return result.result.IsOk()
+	})
+	
+	fmt.Printf("✅ Operations executed: %d\n", len(results))
+	fmt.Printf("✅ Successful operations: %d\n", successCount)
+	fmt.Printf("✅ Failed operations: %d\n", len(results)-successCount)
+	
+	// Display results using functional patterns
+	lo.ForEach(results, func(result struct {
+		name   string
+		result mo.Result[string]
+	}, _ int) {
+		result.result.Match(
+			func(err error) {
+				fmt.Printf("❌ %s: %v\n", result.name, err)
+			},
+			func(value string) {
+				fmt.Printf("✅ %s: %s\n", result.name, value)
+			},
+		)
+	})
+	
+	fmt.Println("Functional retry mechanism completed\n")
+}
+
+// ExampleEnvironmentVariables demonstrates functional environment variable handling
+func ExampleEnvironmentVariables() {
+	fmt.Println("🌍 Functional Environment Variable Patterns:")
+	
+	// Pure functions for environment variable processing
+	type EnvVar struct {
+		key          string
+		value        mo.Option[string]
+		defaultValue string
+		required     bool
+	}
+	
+	// Pure function to get environment variable with Option
+	getEnvVar := func(key string) mo.Option[string] {
+		if value := os.Getenv(key); value != "" {
+			return mo.Some(value)
+		}
+		return mo.None[string]()
+	}
+	
+	// Create environment variable configurations
+	envVars := []EnvVar{
+		{"AWS_REGION", getEnvVar("AWS_REGION"), "us-east-1", true},
+		{"AWS_PROFILE", getEnvVar("AWS_PROFILE"), "default", false},
+		{"LOG_LEVEL", getEnvVar("LOG_LEVEL"), "INFO", false},
+		{"ENVIRONMENT", getEnvVar("ENVIRONMENT"), "development", true},
+		{"CI", getEnvVar("CI"), "false", false},
+	}
+	
+	// Process environment variables using functional patterns
+	processedVars := lo.Map(envVars, func(env EnvVar, _ int) struct {
+		key           string
+		resolvedValue string
+		wasDefault    bool
+		valid         bool
+	} {
+		resolvedValue := env.value.OrElse(env.defaultValue)
+		wasDefault := env.value.IsAbsent()
+		valid := !env.required || env.value.IsPresent()
+		
+		return struct {
+			key           string
+			resolvedValue string
+			wasDefault    bool
+			valid         bool
+		}{
+			key:           env.key,
+			resolvedValue: resolvedValue,
+			wasDefault:    wasDefault,
+			valid:         valid,
+		}
+	})
+	
+	// Filter and categorize results
+	validVars := lo.Filter(processedVars, func(env struct {
+		key           string
+		resolvedValue string
+		wasDefault    bool
+		valid         bool
+	}, _ int) bool {
+		return env.valid
+	})
+	
+	defaultedVars := lo.Filter(validVars, func(env struct {
+		key           string
+		resolvedValue string
+		wasDefault    bool
+		valid         bool
+	}, _ int) bool {
+		return env.wasDefault
+	})
+	
+	fmt.Printf("✅ Total environment variables: %d\n", len(envVars))
+	fmt.Printf("✅ Valid variables: %d\n", len(validVars))
+	fmt.Printf("✅ Using default values: %d\n", len(defaultedVars))
+	
+	// Display results using functional operations
+	lo.ForEach(validVars, func(env struct {
+		key           string
+		resolvedValue string
+		wasDefault    bool
+		valid         bool
+	}, _ int) {
+		status := lo.Ternary(env.wasDefault, "(default)", "(from env)")
+		fmt.Printf("✅ %s=%s %s\n", env.key, env.resolvedValue, status)
+	})
+	
+	// Check CI environment using pure functions
+	ciIndicators := []string{"CI", "CONTINUOUS_INTEGRATION", "GITHUB_ACTIONS", "CIRCLECI", "JENKINS_URL"}
+	isCI := lo.Some(ciIndicators, func(indicator string) bool {
+		return getEnvVar(indicator).Map(func(value string) bool {
+			return strings.ToLower(value) == "true" || value != ""
+		}).OrElse(false)
+	})
+	
+	fmt.Printf("✅ Running in CI environment: %v\n", isCI)
+	
+	// Create configuration map using functional operations
+	configMap := lo.Associate(validVars, func(env struct {
+		key           string
+		resolvedValue string
+		wasDefault    bool
+		valid         bool
+	}) (string, string) {
+		return env.key, env.resolvedValue
+	})
+	
+	fmt.Printf("✅ Configuration map created with %d entries\n", len(configMap))
+	fmt.Println("Functional environment variables completed\n")
+}
+
+// ExampleFullIntegration demonstrates functional composition of multiple services
+func ExampleFullIntegration() {
+	fmt.Println("🎆 Functional Full Integration Patterns:")
+	
+	// Create immutable configuration for complete integration
+	integrationConfig := vasdeference.NewFunctionalCoreConfig(
+		vasdeference.WithCoreRegion("us-east-1"),
+		vasdeference.WithCoreNamespace(fmt.Sprintf("integration-%d", time.Now().Unix())),
+		vasdeference.WithCoreTimeout(2*time.Minute),
+		vasdeference.WithCoreMetrics(true),
+		vasdeference.WithCoreResilience(true),
+		vasdeference.WithCoreMetadata("deployment", "full-stack"),
+		vasdeference.WithCoreMetadata("environment", "production"),
+	)
+	
+	namespace := integrationConfig.GetNamespace().OrElse("default")
+	fmt.Printf("✅ Generated namespace: %s\n", namespace)
+	
+	// Define service configurations using immutable structs
+	type ServiceConfig struct {
+		name         string
+		serviceType  string
+		dependencies []string
+		resources    map[string]interface{}
+		tags         map[string]string
+	}
+	
+	// Create service configurations using functional composition
+	services := lo.Map([]struct {
+		baseName     string
+		serviceType  string
+		dependencies []string
+	}{
+		{"processor", "lambda", []string{}},
+		{"data", "dynamodb", []string{}},
+		{"trigger", "eventbridge", []string{"processor"}},
+		{"workflow", "stepfunctions", []string{"processor", "data"}},
+		{"monitor", "cloudwatch", []string{"processor", "data", "workflow"}},
+	}, func(spec struct {
+		baseName     string
+		serviceType  string
+		dependencies []string
+	}, _ int) ServiceConfig {
+		
+		serviceName := fmt.Sprintf("%s-%s", namespace, spec.baseName)
+		
+		return ServiceConfig{
+			name:         serviceName,
+			serviceType:  spec.serviceType,
+			dependencies: lo.Map(spec.dependencies, func(dep string, _ int) string {
+				return fmt.Sprintf("%s-%s", namespace, dep)
+			}),
+			resources: map[string]interface{}{
+				"arn":    fmt.Sprintf("arn:aws:%s:us-east-1:123456789012:%s", spec.serviceType, serviceName),
+				"status": "pending",
+				"region": integrationConfig.GetRegion(),
+			},
+			tags: map[string]string{
+				"namespace": namespace,
+				"service":   spec.serviceType,
+				"managed":   "functional-framework",
+			},
+		}
+	})
+	
+	fmt.Printf("✅ Created %d service configurations\n", len(services))
+	
+	// Validate service dependencies using pure functions
+	validateDependencies := func(service ServiceConfig, allServices []ServiceConfig) mo.Option[error] {
+		serviceNames := lo.Map(allServices, func(s ServiceConfig, _ int) string { return s.name })
+		
+		for _, dep := range service.dependencies {
+			if !lo.Contains(serviceNames, dep) {
+				return mo.Some[error](fmt.Errorf("service %s has missing dependency: %s", service.name, dep))
+			}
+		}
+		return mo.None[error]()
+	}
+	
+	// Validate all services using functional patterns
+	validationResults := lo.Map(services, func(service ServiceConfig, _ int) struct {
+		serviceName string
+		valid       bool
+		error       mo.Option[error]
+	} {
+		err := validateDependencies(service, services)
+		return struct {
+			serviceName string
+			valid       bool
+			error       mo.Option[error]
+		}{
+			serviceName: service.name,
+			valid:       err.IsAbsent(),
+			error:       err,
+		}
+	})
+	
+	validServices := lo.Filter(validationResults, func(result struct {
+		serviceName string
+		valid       bool
+		error       mo.Option[error]
+	}, _ int) bool {
+		return result.valid
+	})
+	
+	fmt.Printf("✅ Valid services: %d/%d\n", len(validServices), len(services))
+	
+	// Create deployment pipeline using function composition
+	deploymentPipeline := lo.Pipe4(
+		services,
+		func(services []ServiceConfig) []ServiceConfig {
+			// Sort by dependency count (deploy independent services first)
+			return lo.SortBy(services, func(s ServiceConfig) int {
+				return len(s.dependencies)
+			})
+		},
+		func(services []ServiceConfig) []ServiceConfig {
+			// Mark services as deploying
+			return lo.Map(services, func(s ServiceConfig, _ int) ServiceConfig {
+				s.resources["status"] = "deploying"
+				s.resources["deploy_time"] = time.Now().Unix()
+				return s
+			})
+		},
+		func(services []ServiceConfig) []ServiceConfig {
+			// Simulate deployment success
+			return lo.Map(services, func(s ServiceConfig, _ int) ServiceConfig {
+				s.resources["status"] = "deployed"
+				s.resources["health"] = "healthy"
+				return s
+			})
+		},
+		func(services []ServiceConfig) map[string]interface{} {
+			// Generate deployment summary
+			return map[string]interface{}{
+				"namespace":        namespace,
+				"total_services":   len(services),
+				"deployment_time":  time.Now().Format(time.RFC3339),
+				"services":         lo.Map(services, func(s ServiceConfig, _ int) string { return s.name }),
+				"service_types":    lo.Uniq(lo.Map(services, func(s ServiceConfig, _ int) string { return s.serviceType })),
+				"status":           "completed",
+			}
+		},
+	)
+	
+	deploymentSummary := deploymentPipeline
+	fmt.Printf("✅ Deployment completed: %v\n", deploymentSummary["status"])
+	fmt.Printf("✅ Services deployed: %v\n", deploymentSummary["service_types"])
+	
+	// Generate cleanup plan using functional operations
+	cleanupPlan := lo.Reverse(lo.SortBy(services, func(s ServiceConfig) int {
+		return len(s.dependencies) // Cleanup in reverse dependency order
+	}))
+	
+	cleanupActions := lo.Map(cleanupPlan, func(service ServiceConfig, index int) string {
+		return fmt.Sprintf("%d. Delete %s (%s)", index+1, service.name, service.serviceType)
+	})
+	
+	fmt.Printf("✅ Cleanup plan generated with %d actions\n", len(cleanupActions))
+	lo.ForEach(cleanupActions[:3], func(action string, _ int) {
+		fmt.Printf("  %s\n", action)
+	})
+	
+	fmt.Println("Functional full integration completed\n")
+}
+
+// ExampleCloudWatchLogsClient demonstrates functional logging patterns
+func ExampleCloudWatchLogsClient() {
+	fmt.Println("📊 Functional CloudWatch Logs Patterns:")
+	
+	// Immutable log configuration using functional patterns
+	type LogConfig struct {
+		logGroupName    string
+		logStreamName   string
+		retentionDays   int
+		logLevel        string
+		tags            map[string]string
+		encryption      bool
+	}
+	
+	type LogEntry struct {
+		timestamp time.Time
+		level     string
+		message   string
+		metadata  map[string]interface{}
+	}
+	
+	// Pure functions for log processing
+	createLogEntry := func(level, message string, metadata map[string]interface{}) LogEntry {
+		return LogEntry{
+			timestamp: time.Now(),
+			level:     level,
+			message:   message,
+			metadata:  metadata,
 		}
 	}
 	
-	// Expected: attempts should be >= 3
-	fmt.Printf("Retry attempts made: %d\n", attempts)
-	fmt.Println("Retry mechanism completed")
+	formatLogEntry := func(entry LogEntry) string {
+		return fmt.Sprintf("[%s] %s: %s", 
+			entry.timestamp.Format(time.RFC3339),
+			entry.level,
+			entry.message)
+	}
+	
+	// Create log configurations for different services
+	logConfigs := lo.Map([]struct {
+		service       string
+		retentionDays int
+		level         string
+	}{
+		{"lambda-processor", 30, "INFO"},
+		{"api-gateway", 7, "WARN"},
+		{"step-functions", 90, "DEBUG"},
+		{"eventbridge", 14, "INFO"},
+	}, func(spec struct {
+		service       string
+		retentionDays int
+		level         string
+	}, _ int) LogConfig {
+		return LogConfig{
+			logGroupName:  fmt.Sprintf("/aws/%s", spec.service),
+			logStreamName: fmt.Sprintf("%s-%d", spec.service, time.Now().Unix()),
+			retentionDays: spec.retentionDays,
+			logLevel:      spec.level,
+			tags: map[string]string{
+				"service":     spec.service,
+				"environment": "production",
+				"framework":   "functional",
+			},
+			encryption: true,
+		}
+	})
+	
+	fmt.Printf("✅ Created %d log configurations\n", len(logConfigs))
+	
+	// Generate sample log entries using functional patterns
+	sampleLogs := lo.FlatMap(logConfigs, func(config LogConfig, _ int) []LogEntry {
+		return lo.Map([]struct {
+			level   string
+			message string
+		}{
+			{"INFO", "Service started successfully"},
+			{"DEBUG", "Processing request"},
+			{"WARN", "Retry attempt needed"},
+			{"ERROR", "Operation failed"},
+		}, func(log struct {
+			level   string
+			message string
+		}, _ int) LogEntry {
+			return createLogEntry(log.level, log.message, map[string]interface{}{
+				"service":    strings.TrimPrefix(config.logGroupName, "/aws/"),
+				"log_group": config.logGroupName,
+				"session_id": fmt.Sprintf("session-%d", lo.RandomInt(1000, 9999)),
+			})
+		})
+	})
+	
+	// Filter logs by level using functional operations
+	logLevels := []string{"ERROR", "WARN", "INFO", "DEBUG"}
+	logCounts := lo.Associate(logLevels, func(level string) (string, int) {
+		count := lo.CountBy(sampleLogs, func(entry LogEntry) bool {
+			return entry.level == level
+		})
+		return level, count
+	})
+	
+	fmt.Printf("✅ Generated %d log entries\n", len(sampleLogs))
+	for level, count := range logCounts {
+		if count > 0 {
+			fmt.Printf("✅ %s level: %d entries\n", level, count)
+		}
+	}
+	
+	// Process logs using monadic patterns
+	processLogs := func(entries []LogEntry, minLevel string) mo.Option[[]string] {
+		levelPriority := map[string]int{"DEBUG": 0, "INFO": 1, "WARN": 2, "ERROR": 3}
+		minPriority, exists := levelPriority[minLevel]
+		if !exists {
+			return mo.None[[]string]()
+		}
+		
+		filteredLogs := lo.Filter(entries, func(entry LogEntry, _ int) bool {
+			return levelPriority[entry.level] >= minPriority
+		})
+		
+		formattedLogs := lo.Map(filteredLogs, func(entry LogEntry, _ int) string {
+			return formatLogEntry(entry)
+		})
+		
+		return mo.Some(formattedLogs)
+	}
+	
+	// Process logs with different filtering levels
+	processingResults := lo.Map([]string{"INFO", "WARN", "ERROR"}, func(level string, _ int) struct {
+		level  string
+		count  int
+		valid  bool
+	} {
+		result := processLogs(sampleLogs, level)
+		return struct {
+			level  string
+			count  int
+			valid  bool
+		}{
+			level: level,
+			count: result.Map(func(logs []string) int { return len(logs) }).OrElse(0),
+			valid: result.IsPresent(),
+		}
+	})
+	
+	lo.ForEach(processingResults, func(result struct {
+		level  string
+		count  int
+		valid  bool
+	}, _ int) {
+		if result.valid {
+			fmt.Printf("✅ Processed %s+ logs: %d entries\n", result.level, result.count)
+		}
+	})
+	
+	fmt.Printf("✅ CloudWatch client type reference: %T\n", &cloudwatchlogs.Client{})
+	fmt.Println("Functional CloudWatch Logs patterns completed\n")
 }
 
-// ExampleEnvironmentVariables demonstrates environment variable handling
-func ExampleEnvironmentVariables() {
-	fmt.Println("VasDeference environment variable patterns:")
-	
-	// vdf := vasdeference.New(t)
-	// defer vdf.Cleanup()
-	
-	// Get environment variables with defaults
-	// region := vdf.GetEnvVarWithDefault("AWS_REGION", "us-east-1")
-	// profile := vdf.GetEnvVarWithDefault("AWS_PROFILE", "default")
-	fmt.Println("Getting AWS_REGION with default: us-east-1")
-	fmt.Println("Getting AWS_PROFILE with default: default")
-	
-	// Expected: region and profile should not be empty
-	
-	// Check if running in CI
-	// isCI := vdf.IsCIEnvironment()
-	// Expected: isCI should be boolean type
-	fmt.Println("Checking if running in CI environment")
-	fmt.Println("Environment variables completed")
-}
 
-// ExampleFullIntegration demonstrates a complete integration scenario
-func ExampleFullIntegration() {
-	fmt.Println("VasDeference full integration patterns:")
-	
-	// Create VasDeference with production-like configuration
-	// ctx := vasdeference.NewTestContext(t)
-	_ = /* namespace */ fmt.Sprintf("integration-%d", time.Now().Unix())
-	// arrange := vasdeference.NewArrangeWithNamespace(ctx, namespace)
-	// defer arrange.Cleanup()
-	
-	// Generate unique resource names with namespace
-	_ = /* functionName */ namespace + "-processor"
-	_ = /* tableName */ namespace + "-data"
-	_ = /* ruleName */ namespace + "-trigger"
-	_ = /* stateMachineName */ namespace + "-workflow"
-	
-	fmt.Printf("Generated namespace: %s\n", namespace)
-	fmt.Printf("Function name: %s\n", functionName)
-	fmt.Printf("Table name: %s\n", tableName)
-	fmt.Printf("Rule name: %s\n", ruleName)
-	fmt.Printf("State machine name: %s\n", stateMachineName)
-	
-	// Expected: All names should be unique and contain the namespace
-	
-	// Register cleanup for all resources
-	// arrange.RegisterCleanup(func() error {
-	//     // In a real test, this would clean up all created resources
-	//     return nil
-	// })
-	fmt.Println("Registering cleanup for all resources")
-	fmt.Println("Full integration completed")
-}
-
-// ExampleCloudWatchLogsClient demonstrates CloudWatch Logs client creation
-func ExampleCloudWatchLogsClient() {
-	fmt.Println("VasDeference CloudWatch Logs client patterns:")
-	
-	// vdf := vasdeference.New(t)
-	// defer vdf.Cleanup()
-	
-	// logsClient := vdf.CreateCloudWatchLogsClient()
-	// Expected: logsClient should not be nil and should be *cloudwatchlogs.Client type
-	fmt.Println("Creating CloudWatch Logs client through VasDeference")
-	fmt.Printf("Expected client type: %T\n", &cloudwatchlogs.Client{})
-	fmt.Println("CloudWatch Logs client completed")
-}
-
-
-// ExampleUniqueIdGeneration demonstrates unique ID generation
+// ExampleUniqueIdGeneration demonstrates functional ID generation patterns
 func ExampleUniqueIdGeneration() {
-	fmt.Println("VasDeference unique ID generation patterns:")
+	fmt.Println("🆔 Functional Unique ID Generation Patterns:")
 	
-	// id1 := vasdeference.UniqueId()
-	// id2 := vasdeference.UniqueId()
-	fmt.Println("Generating unique ID 1")
-	fmt.Println("Generating unique ID 2")
+	// Pure functions for ID generation using different strategies
+	type IDGenerator func() string
+	type IDConfig struct {
+		prefix    mo.Option[string]
+		suffix    mo.Option[string]
+		length    int
+		timestamp bool
+		random    bool
+	}
 	
-	// Expected: IDs should not be empty, should not be equal, should have length > 0
-	// UniqueId returns Unix nanoseconds as string, length varies
-	fmt.Println("IDs are based on Unix nanoseconds for uniqueness")
-	fmt.Println("Unique ID generation completed")
+	// Create ID generators using functional composition
+	createTimestampID := func(config IDConfig) IDGenerator {
+		return func() string {
+			base := fmt.Sprintf("%d", time.Now().UnixNano())
+			if config.random {
+				base += fmt.Sprintf("-%d", lo.RandomInt(1000, 9999))
+			}
+			return lo.Pipe3(
+				base,
+				func(id string) string {
+					return config.prefix.Map(func(p string) string { return p + "-" + id }).OrElse(id)
+				},
+				func(id string) string {
+					return config.suffix.Map(func(s string) string { return id + "-" + s }).OrElse(id)
+				},
+				func(id string) string {
+					if config.length > 0 && len(id) > config.length {
+						return id[:config.length]
+					}
+					return id
+				},
+			)
+		}
+	}
+	
+	createRandomID := func(config IDConfig) IDGenerator {
+		return func() string {
+			chars := "abcdefghijklmnopqrstuvwxyz0123456789"
+			length := lo.Ternary(config.length > 0, config.length, 8)
+			
+			randomChars := lo.Times(length, func(_ int) string {
+				return string(chars[lo.RandomInt(0, len(chars))])
+			})
+			
+			base := strings.Join(randomChars, "")
+			
+			return lo.Pipe2(
+				base,
+				func(id string) string {
+					return config.prefix.Map(func(p string) string { return p + "-" + id }).OrElse(id)
+				},
+				func(id string) string {
+					return config.suffix.Map(func(s string) string { return id + "-" + s }).OrElse(id)
+				},
+			)
+		}
+	}
+	
+	// Create different ID generator configurations
+	idConfigs := []struct {
+		name      string
+		config    IDConfig
+		generator IDGenerator
+	}{
+		{
+			name: "timestamp-basic",
+			config: IDConfig{timestamp: true},
+			generator: nil, // Will be set below
+		},
+		{
+			name: "timestamp-with-prefix",
+			config: IDConfig{
+				prefix:    mo.Some("func"),
+				timestamp: true,
+				random:    true,
+			},
+			generator: nil,
+		},
+		{
+			name: "random-short",
+			config: IDConfig{
+				length: 6,
+				random: true,
+			},
+			generator: nil,
+		},
+		{
+			name: "random-with-service",
+			config: IDConfig{
+				prefix: mo.Some("svc"),
+				suffix: mo.Some("prod"),
+				length: 12,
+				random: true,
+			},
+			generator: nil,
+		},
+	}
+	
+	// Initialize generators based on configuration
+	for i, config := range idConfigs {
+		if config.config.timestamp {
+			idConfigs[i].generator = createTimestampID(config.config)
+		} else {
+			idConfigs[i].generator = createRandomID(config.config)
+		}
+	}
+	
+	// Generate IDs using functional patterns
+	generatedIDs := lo.FlatMap(idConfigs, func(config struct {
+		name      string
+		config    IDConfig
+		generator IDGenerator
+	}, _ int) []struct {
+		generatorName string
+		id            string
+		unique        bool
+	} {
+		// Generate multiple IDs to test uniqueness
+		ids := lo.Times(3, func(_ int) string {
+			time.Sleep(time.Nanosecond) // Ensure timestamp difference
+			return config.generator()
+		})
+		
+		return lo.Map(ids, func(id string, index int) struct {
+			generatorName string
+			id            string
+			unique        bool
+		} {
+			return struct {
+				generatorName string
+				id            string
+				unique        bool
+			}{
+				generatorName: config.name,
+				id:            id,
+				unique:        true, // Will be validated below
+			}
+		})
+	})
+	
+	fmt.Printf("✅ Generated %d IDs using %d different strategies\n", len(generatedIDs), len(idConfigs))
+	
+	// Validate uniqueness using functional operations
+	allIDs := lo.Map(generatedIDs, func(item struct {
+		generatorName string
+		id            string
+		unique        bool
+	}, _ int) string {
+		return item.id
+	})
+	
+	uniqueIDs := lo.Uniq(allIDs)
+	uniquenessPct := float64(len(uniqueIDs)) / float64(len(allIDs)) * 100
+	
+	fmt.Printf("✅ Uniqueness validation: %.1f%% (%d/%d unique)\n", uniquenessPct, len(uniqueIDs), len(allIDs))
+	
+	// Group IDs by generator type
+	idGroups := lo.GroupBy(generatedIDs, func(item struct {
+		generatorName string
+		id            string
+		unique        bool
+	}) string {
+		return item.generatorName
+	})
+	
+	for generatorName, ids := range idGroups {
+		sampleID := ids[0].id
+		fmt.Printf("✅ %s generator - sample: %s (length: %d)\n", generatorName, sampleID, len(sampleID))
+	}
+	
+	// Demonstrate functional validation of ID format
+	validateIDFormat := func(id string) mo.Option[error] {
+		if id == "" {
+			return mo.Some[error](fmt.Errorf("ID cannot be empty"))
+		}
+		if len(id) < 3 {
+			return mo.Some[error](fmt.Errorf("ID too short: %s", id))
+		}
+		return mo.None[error]()
+	}
+	
+	validIDs := lo.Filter(allIDs, func(id string, _ int) bool {
+		return validateIDFormat(id).IsAbsent()
+	})
+	
+	fmt.Printf("✅ Format validation: %d/%d IDs valid\n", len(validIDs), len(allIDs))
+	fmt.Println("Functional unique ID generation completed\n")
 }
 
 // ExampleTestingInterface demonstrates TestingT interface methods
@@ -476,7 +1285,7 @@ func ExampleTerraformOutputErrors() {
 	fmt.Println("Testing nil outputs map - should return error")
 	
 	// Test with non-string value
-	_ = /* outputs */ map[string]interface{}{
+	outputs := map[string]interface{}{
 		"numeric_value": 123,
 		"boolean_value": true,
 	}
@@ -530,7 +1339,7 @@ func ExampleComprehensiveConfiguration() {
 	fmt.Printf("Expected default region: %s\n", vasdeference.RegionUSEast1)
 	
 	// Test NewWithOptionsE with default values
-	_ = /* opts */ &vasdeference.VasDeferenceOptions{
+	opts := &vasdeference.VasDeferenceOptions{
 		Region:     "", // Should get default
 		MaxRetries: 0,  // Should get default  
 		RetryDelay: 0,  // Should get default
@@ -547,58 +1356,227 @@ func ExampleComprehensiveConfiguration() {
 	fmt.Println("Comprehensive configuration completed")
 }
 
-// ExampleAdvancedFeatures demonstrates advanced VasDeference features
+// ExampleAdvancedFeatures demonstrates advanced functional programming patterns
 func ExampleAdvancedFeatures() {
-	fmt.Println("VasDeference advanced features patterns:")
+	fmt.Println("🚀 Advanced Functional Programming Patterns:")
 	
-	// vdf := vasdeference.New(t)
-	// defer vdf.Cleanup()
+	// Advanced functional composition with higher-order functions
+	type AdvancedConfig struct {
+		region          string
+		timeout         time.Duration
+		clientConfigs   map[string]interface{}
+		featureFlags    map[string]bool
+		performanceTier string
+	}
 	
-	// Test createContext with timeout
-	// ctx := vdf.CreateContextWithTimeout(5 * time.Second)
-	// Expected: ctx should not be nil
-	fmt.Println("Creating context with 5 second timeout")
+	// Higher-order function that returns a configuration transformer
+	createConfigTransformer := func(transformType string) func(AdvancedConfig) AdvancedConfig {
+		switch transformType {
+		case "production":
+			return func(config AdvancedConfig) AdvancedConfig {
+				config.timeout = 60 * time.Second
+				config.performanceTier = "high"
+				config.featureFlags["monitoring"] = true
+				config.featureFlags["caching"] = true
+				return config
+			}
+		case "development":
+			return func(config AdvancedConfig) AdvancedConfig {
+				config.timeout = 15 * time.Second
+				config.performanceTier = "standard"
+				config.featureFlags["debug"] = true
+				config.featureFlags["verbose_logging"] = true
+				return config
+			}
+		default:
+			return func(config AdvancedConfig) AdvancedConfig { return config }
+		}
+	}
 	
-	// Test default region getter
-	// region := vdf.GetDefaultRegion()
-	// Expected: region should equal vasdeference.RegionUSEast1
-	fmt.Printf("Getting default region: %s\n", vasdeference.RegionUSEast1)
+	// Create base configuration
+	baseConfig := AdvancedConfig{
+		region:          vasdeference.RegionUSEast1,
+		timeout:         30 * time.Second,
+		clientConfigs:   make(map[string]interface{}),
+		featureFlags:    make(map[string]bool),
+		performanceTier: "standard",
+	}
 	
-	// Test environment variable getter with empty key
-	// envVal := vdf.GetEnvVar("")
-	// Expected: envVal should equal ""
-	fmt.Println("Getting empty environment variable key -> expected: empty string")
+	// Apply transformations using functional composition
+	environments := []string{"development", "staging", "production"}
+	configurations := lo.Map(environments, func(env string, _ int) struct {
+		environment string
+		config      AdvancedConfig
+	} {
+		transformer := createConfigTransformer(env)
+		transformedConfig := transformer(baseConfig)
+		transformedConfig.clientConfigs["environment"] = env
+		
+		return struct {
+			environment string
+			config      AdvancedConfig
+		}{
+			environment: env,
+			config:      transformedConfig,
+		}
+	})
 	
-	// Test GetEnvVarWithDefault with empty key
-	// envVal2 := vdf.GetEnvVarWithDefault("", "default-val")
-	// Expected: envVal2 should equal "default-val"
-	fmt.Println("Getting empty key with default 'default-val' -> expected: 'default-val'")
+	fmt.Printf("✅ Created %d environment configurations\n", len(configurations))
 	
-	// Test PrefixResourceName with various inputs
-	// prefixed := vdf.PrefixResourceName("")
-	// Expected: prefixed should contain namespace
-	fmt.Println("Prefixing empty resource name with namespace")
+	// Advanced error handling with Result monad chains
+	type ValidationRule[T any] func(T) mo.Result[T]
 	
-	// Test Lambda client creation with different regions
-	// lambdaClient1 := vdf.CreateLambdaClient()
-	// lambdaClient2 := vdf.CreateLambdaClientWithRegion(vasdeference.RegionUSWest2)
-	// Expected: both clients should not be nil
-	fmt.Println("Creating Lambda clients for default and us-west-2 regions")
+	validateTimeout := func(config AdvancedConfig) mo.Result[AdvancedConfig] {
+		if config.timeout <= 0 || config.timeout > 10*time.Minute {
+			return mo.Err[AdvancedConfig](fmt.Errorf("invalid timeout: %v", config.timeout))
+		}
+		return mo.Ok(config)
+	}
 	
-	// Test all AWS service client creation methods
-	fmt.Println("Creating all AWS service clients:")
-	fmt.Println("  - DynamoDB client")
-	fmt.Println("  - EventBridge client")
-	fmt.Println("  - Step Functions client")
-	fmt.Println("  - CloudWatch Logs client")
-	// Expected: all clients should not be nil
+	validateRegion := func(config AdvancedConfig) mo.Result[AdvancedConfig] {
+		validRegions := []string{vasdeference.RegionUSEast1, "us-west-2", "eu-west-1"}
+		if !lo.Contains(validRegions, config.region) {
+			return mo.Err[AdvancedConfig](fmt.Errorf("invalid region: %s", config.region))
+		}
+		return mo.Ok(config)
+	}
 	
-	// Test CI detection with various environment variables
-	fmt.Println("Testing CI detection with various CI systems:")
-	fmt.Println("  - TRAVIS=true -> should detect CI")
-	fmt.Println("  - JENKINS_URL=http://jenkins.example.com -> should detect CI")
-	fmt.Println("  - BUILDKITE=true -> should detect CI")
-	fmt.Println("Advanced features completed")
+	validateFeatures := func(config AdvancedConfig) mo.Result[AdvancedConfig] {
+		requiredFeatures := []string{"monitoring", "debug", "caching", "verbose_logging"}
+		enabled := lo.Filter(requiredFeatures, func(feature string, _ int) bool {
+			return config.featureFlags[feature]
+		})
+		
+		if len(enabled) == 0 {
+			return mo.Err[AdvancedConfig](fmt.Errorf("no features enabled"))
+		}
+		return mo.Ok(config)
+	}
+	
+	// Chain validation using monadic operations
+	validationResults := lo.Map(configurations, func(item struct {
+		environment string
+		config      AdvancedConfig
+	}, _ int) struct {
+		environment string
+		result      mo.Result[AdvancedConfig]
+		valid       bool
+	} {
+		// Chain validations using FlatMap
+		result := mo.Ok(item.config).
+			FlatMap(func(c AdvancedConfig) mo.Result[AdvancedConfig] { return validateTimeout(c) }).
+			FlatMap(func(c AdvancedConfig) mo.Result[AdvancedConfig] { return validateRegion(c) }).
+			FlatMap(func(c AdvancedConfig) mo.Result[AdvancedConfig] { return validateFeatures(c) })
+		
+		return struct {
+			environment string
+			result      mo.Result[AdvancedConfig]
+			valid       bool
+		}{
+			environment: item.environment,
+			result:      result,
+			valid:       result.IsOk(),
+		}
+	})
+	
+	validConfigs := lo.Filter(validationResults, func(result struct {
+		environment string
+		result      mo.Result[AdvancedConfig]
+		valid       bool
+	}, _ int) bool {
+		return result.valid
+	})
+	
+	fmt.Printf("✅ Valid configurations: %d/%d\n", len(validConfigs), len(configurations))
+	
+	// Advanced client factory using generics and functional patterns
+	type ClientFactory[T any] func(config AdvancedConfig) mo.Option[T]
+	type MockClient struct {
+		service     string
+		region      string
+		timeout     time.Duration
+		configured  bool
+	}
+	
+	createClientFactory := func(serviceType string) ClientFactory[MockClient] {
+		return func(config AdvancedConfig) mo.Option[MockClient] {
+			if config.region == "" {
+				return mo.None[MockClient]()
+			}
+			
+			return mo.Some(MockClient{
+				service:    serviceType,
+				region:     config.region,
+				timeout:    config.timeout,
+				configured: true,
+			})
+		}
+	}
+	
+	// Create multiple service clients using functional factories
+	serviceTypes := []string{"lambda", "dynamodb", "eventbridge", "stepfunctions"}
+	clientResults := lo.FlatMap(validConfigs, func(configResult struct {
+		environment string
+		result      mo.Result[AdvancedConfig]
+		valid       bool
+	}, _ int) []struct {
+		environment string
+		service     string
+		client      mo.Option[MockClient]
+	} {
+		config := configResult.result.MustGet()
+		
+		return lo.Map(serviceTypes, func(service string, _ int) struct {
+			environment string
+			service     string
+			client      mo.Option[MockClient]
+		} {
+			factory := createClientFactory(service)
+			client := factory(config)
+			
+			return struct {
+				environment string
+				service     string
+				client      mo.Option[MockClient]
+			}{
+				environment: configResult.environment,
+				service:     service,
+				client:      client,
+			}
+		})
+	})
+	
+	successfulClients := lo.Filter(clientResults, func(result struct {
+		environment string
+		service     string
+		client      mo.Option[MockClient]
+	}, _ int) bool {
+		return result.client.IsPresent()
+	})
+	
+	fmt.Printf("✅ Successfully created %d service clients\n", len(successfulClients))
+	
+	// Group clients by environment and service
+	env Groups := lo.GroupBy(successfulClients, func(result struct {
+		environment string
+		service     string
+		client      mo.Option[MockClient]
+	}) string {
+		return result.environment
+	})
+	
+	for env, clients := range envGroups {
+		services := lo.Map(clients, func(client struct {
+			environment string
+			service     string
+			client      mo.Option[MockClient]
+		}, _ int) string {
+			return client.service
+		})
+		fmt.Printf("✅ %s environment: %s\n", env, strings.Join(services, ", "))
+	}
+	
+	fmt.Println("Advanced functional programming patterns completed\n")
 }
 
 // ExampleTerratestIntegration demonstrates Terratest integration features
@@ -750,12 +1728,13 @@ func ExampleTerratestTerraformOperations() {
 	fmt.Println("Terraform operations with Terratest completed")
 }
 
-// runAllExamples demonstrates running all core VasDeference examples
+// runAllExamples demonstrates running all functional programming examples
 func runAllExamples() {
-	fmt.Println("Running all VasDeference core package examples:")
+	fmt.Println("🚀 Running all Functional Programming Examples:")
+	fmt.Println("   Using samber/lo and samber/mo with immutable data structures")
 	fmt.Println("")
 	
-	ExampleBasicUsage()
+	ExampleFunctionalCoreUsage()
 	fmt.Println("")
 	
 	ExampleWithCustomOptions()
@@ -834,11 +1813,13 @@ func runAllExamples() {
 	fmt.Println("")
 	
 	ExampleTerratestTerraformOperations()
-	fmt.Println("All VasDeference core examples completed")
+	fmt.Println("✨ All functional programming examples completed successfully!")
 }
 
 func main() {
-	// This file demonstrates core VasDeference framework usage patterns.
+	// This file demonstrates functional programming patterns using samber/lo and samber/mo.
+	// Features immutable data structures, monadic error handling, function composition,
+	// and type-safe operations with Go generics.
 	// Run examples with: go run ./examples/core/examples.go
 	
 	runAllExamples()

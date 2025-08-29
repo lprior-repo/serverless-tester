@@ -443,12 +443,7 @@ func assertHistoryEventCountE(ctx *TestContext, executionArn string, eventType t
 
 // Utility Functions for Assertions
 
-// ListExecutions lists executions for a state machine (simplified version for assertions)
-func ListExecutionsE(ctx *TestContext, stateMachineArn string, statusFilter types.ExecutionStatus, maxResults int32) ([]*ExecutionResult, error) {
-	// This would need to be implemented to call the actual AWS API
-	// For now, return empty slice to allow compilation
-	return []*ExecutionResult{}, nil
-}
+// ListExecutionsE is implemented in operations.go
 
 // GetExecutionHistory gets execution history (simplified version for assertions)
 // Note: Implementation moved to history.go

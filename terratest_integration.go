@@ -170,16 +170,27 @@ func (vdf *VasDeference) GetAvailabilityZones() []string {
 
 // CreateRandomResourceName creates a resource name with random suffix
 func (vdf *VasDeference) CreateRandomResourceName(prefix string, maxLength int) string {
+	// Handle edge cases for maxLength
+	if maxLength <= 0 {
+		return ""
+	}
+	
 	suffix := random.UniqueId()
 	name := fmt.Sprintf("%s-%s", prefix, suffix)
 	
 	// Truncate if necessary to meet AWS naming requirements
 	if len(name) > maxLength {
 		availableLength := maxLength - len(suffix) - 1 // -1 for hyphen
-		if availableLength > 0 {
+		if availableLength > 0 && availableLength <= len(prefix) {
 			name = fmt.Sprintf("%s-%s", prefix[:availableLength], suffix)
-		} else {
+		} else if maxLength >= len(suffix) {
 			name = suffix[:maxLength]
+		} else {
+			// If maxLength is smaller than suffix, just truncate suffix
+			name = suffix
+			if len(name) > maxLength {
+				name = suffix[:maxLength]
+			}
 		}
 	}
 	

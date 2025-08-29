@@ -789,6 +789,13 @@ func matchesPatternItem(patternItem, eventValue interface{}) bool {
 		return matchesSpecialPattern(patternMap, eventValue)
 	}
 	
+	// Handle numeric type comparisons (JSON numbers vs Go native numbers)
+	if isNumeric(patternItem) && isNumeric(eventValue) {
+		patternFloat, _ := toFloat64(patternItem)
+		eventFloat, _ := toFloat64(eventValue)
+		return patternFloat == eventFloat
+	}
+	
 	// Direct value comparison
 	return reflect.DeepEqual(patternItem, eventValue)
 }
@@ -878,6 +885,20 @@ func toFloat64(value interface{}) (float64, error) {
 		return strconv.ParseFloat(v, 64)
 	default:
 		return 0, fmt.Errorf("cannot convert %T to float64", value)
+	}
+}
+
+// isNumeric checks if a value is a numeric type
+func isNumeric(value interface{}) bool {
+	switch value.(type) {
+	case float64, float32, int, int32, int64:
+		return true
+	case string:
+		// Check if string can be parsed as a number
+		_, err := strconv.ParseFloat(value.(string), 64)
+		return err == nil
+	default:
+		return false
 	}
 }
 

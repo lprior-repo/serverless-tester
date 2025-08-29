@@ -741,6 +741,428 @@ func PublishLayerVersionE(ctx *TestContext, input *lambda.PublishLayerVersionInp
 	return result, nil
 }
 
+// =============================================================================
+// FUNCTION URL CONFIGURATION
+// =============================================================================
+
+// FunctionUrlConfig represents Lambda function URL configuration
+type FunctionUrlConfig struct {
+	FunctionName   string
+	AuthType       types.FunctionUrlAuthType
+	Cors           *types.Cors
+	Qualifier      string
+}
+
+// FunctionUrlResult represents the result of function URL operations
+type FunctionUrlResult struct {
+	FunctionUrl      string
+	FunctionArn      string
+	AuthType         types.FunctionUrlAuthType
+	Cors             *types.Cors
+	CreationTime     string
+	LastModifiedTime string
+}
+
+// CreateFunctionUrl creates a function URL configuration and fails the test if an error occurs
+func CreateFunctionUrl(ctx *TestContext, config FunctionUrlConfig) *FunctionUrlResult {
+	result, err := CreateFunctionUrlE(ctx, config)
+	if err != nil {
+		ctx.T.Fatalf("Failed to create function URL: %v", err)
+	}
+	return result
+}
+
+// CreateFunctionUrlE creates a function URL configuration and returns any error
+func CreateFunctionUrlE(ctx *TestContext, config FunctionUrlConfig) (*FunctionUrlResult, error) {
+	if err := validateFunctionName(config.FunctionName); err != nil {
+		return nil, fmt.Errorf("invalid function name: %w", err)
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.CreateFunctionUrlConfigInput{
+		FunctionName: aws.String(config.FunctionName),
+		AuthType:     config.AuthType,
+	}
+
+	if config.Cors != nil {
+		input.Cors = config.Cors
+	}
+	if config.Qualifier != "" {
+		input.Qualifier = aws.String(config.Qualifier)
+	}
+
+	output, err := client.CreateFunctionUrlConfig(context.Background(), input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create function URL: %w", err)
+	}
+
+	return &FunctionUrlResult{
+		FunctionUrl:      aws.ToString(output.FunctionUrl),
+		FunctionArn:      aws.ToString(output.FunctionArn),
+		AuthType:         output.AuthType,
+		Cors:             output.Cors,
+		CreationTime:     aws.ToString(output.CreationTime),
+		LastModifiedTime: aws.ToString(output.LastModifiedTime),
+	}, nil
+}
+
+// GetFunctionUrl gets the function URL configuration and fails the test if an error occurs
+func GetFunctionUrl(ctx *TestContext, functionName string) *FunctionUrlResult {
+	result, err := GetFunctionUrlE(ctx, functionName)
+	if err != nil {
+		ctx.T.Fatalf("Failed to get function URL: %v", err)
+	}
+	return result
+}
+
+// GetFunctionUrlE gets the function URL configuration and returns any error
+func GetFunctionUrlE(ctx *TestContext, functionName string) (*FunctionUrlResult, error) {
+	if err := validateFunctionName(functionName); err != nil {
+		return nil, fmt.Errorf("invalid function name: %w", err)
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.GetFunctionUrlConfigInput{
+		FunctionName: aws.String(functionName),
+	}
+
+	output, err := client.GetFunctionUrlConfig(context.Background(), input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get function URL: %w", err)
+	}
+
+	return &FunctionUrlResult{
+		FunctionUrl:      aws.ToString(output.FunctionUrl),
+		FunctionArn:      aws.ToString(output.FunctionArn),
+		AuthType:         output.AuthType,
+		Cors:             output.Cors,
+		CreationTime:     aws.ToString(output.CreationTime),
+		LastModifiedTime: aws.ToString(output.LastModifiedTime),
+	}, nil
+}
+
+// DeleteFunctionUrl deletes the function URL configuration and fails the test if an error occurs
+func DeleteFunctionUrl(ctx *TestContext, functionName string) {
+	err := DeleteFunctionUrlE(ctx, functionName)
+	if err != nil {
+		ctx.T.Fatalf("Failed to delete function URL: %v", err)
+	}
+}
+
+// DeleteFunctionUrlE deletes the function URL configuration and returns any error
+func DeleteFunctionUrlE(ctx *TestContext, functionName string) error {
+	if err := validateFunctionName(functionName); err != nil {
+		return fmt.Errorf("invalid function name: %w", err)
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.DeleteFunctionUrlConfigInput{
+		FunctionName: aws.String(functionName),
+	}
+
+	_, err := client.DeleteFunctionUrlConfig(context.Background(), input)
+	if err != nil {
+		return fmt.Errorf("failed to delete function URL: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateFunctionUrl updates the function URL configuration and fails the test if an error occurs
+func UpdateFunctionUrl(ctx *TestContext, config FunctionUrlConfig) *FunctionUrlResult {
+	result, err := UpdateFunctionUrlE(ctx, config)
+	if err != nil {
+		ctx.T.Fatalf("Failed to update function URL: %v", err)
+	}
+	return result
+}
+
+// UpdateFunctionUrlE updates the function URL configuration and returns any error
+func UpdateFunctionUrlE(ctx *TestContext, config FunctionUrlConfig) (*FunctionUrlResult, error) {
+	if err := validateFunctionName(config.FunctionName); err != nil {
+		return nil, fmt.Errorf("invalid function name: %w", err)
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.UpdateFunctionUrlConfigInput{
+		FunctionName: aws.String(config.FunctionName),
+		AuthType:     config.AuthType,
+	}
+
+	if config.Cors != nil {
+		input.Cors = config.Cors
+	}
+	if config.Qualifier != "" {
+		input.Qualifier = aws.String(config.Qualifier)
+	}
+
+	output, err := client.UpdateFunctionUrlConfig(context.Background(), input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update function URL: %w", err)
+	}
+
+	return &FunctionUrlResult{
+		FunctionUrl:      aws.ToString(output.FunctionUrl),
+		FunctionArn:      aws.ToString(output.FunctionArn),
+		AuthType:         output.AuthType,
+		Cors:             output.Cors,
+		CreationTime:     aws.ToString(output.CreationTime),
+		LastModifiedTime: aws.ToString(output.LastModifiedTime),
+	}, nil
+}
+
+// =============================================================================
+// PROVISIONED CONCURRENCY CONFIGURATION
+// =============================================================================
+
+// ProvisionedConcurrencyConfig represents provisioned concurrency configuration
+type ProvisionedConcurrencyConfig struct {
+	FunctionName                    string
+	Qualifier                       string
+	ProvisionedConcurrencyRequested int32
+}
+
+// ProvisionedConcurrencyResult represents the result of provisioned concurrency operations
+type ProvisionedConcurrencyResult struct {
+	FunctionArn                      string
+	Qualifier                        string
+	ProvisionedConcurrencyRequested  int32
+	ProvisionedConcurrencyAvailable  int32
+	ProvisionedConcurrencyAllocated  int32
+	Status                           types.ProvisionedConcurrencyStatus
+	StatusReason                     string
+	LastModified                     string
+}
+
+// PutProvisionedConcurrency configures provisioned concurrency and fails the test if an error occurs
+func PutProvisionedConcurrency(ctx *TestContext, config ProvisionedConcurrencyConfig) *ProvisionedConcurrencyResult {
+	result, err := PutProvisionedConcurrencyE(ctx, config)
+	if err != nil {
+		ctx.T.Fatalf("Failed to put provisioned concurrency: %v", err)
+	}
+	return result
+}
+
+// PutProvisionedConcurrencyE configures provisioned concurrency and returns any error
+func PutProvisionedConcurrencyE(ctx *TestContext, config ProvisionedConcurrencyConfig) (*ProvisionedConcurrencyResult, error) {
+	if err := validateFunctionName(config.FunctionName); err != nil {
+		return nil, fmt.Errorf("invalid function name: %w", err)
+	}
+
+	if config.ProvisionedConcurrencyRequested <= 0 {
+		return nil, fmt.Errorf("provisioned concurrency must be greater than 0")
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.PutProvisionedConcurrencyConfigInput{
+		FunctionName:                    aws.String(config.FunctionName),
+		Qualifier:                       aws.String(config.Qualifier),
+		ProvisionedConcurrencyRequested: aws.Int32(config.ProvisionedConcurrencyRequested),
+	}
+
+	output, err := client.PutProvisionedConcurrencyConfig(context.Background(), input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to put provisioned concurrency: %w", err)
+	}
+
+	return &ProvisionedConcurrencyResult{
+		FunctionArn:                      aws.ToString(output.FunctionArn),
+		Qualifier:                        aws.ToString(output.Qualifier),
+		ProvisionedConcurrencyRequested:  aws.ToInt32(output.ProvisionedConcurrencyRequested),
+		ProvisionedConcurrencyAvailable:  aws.ToInt32(output.ProvisionedConcurrencyAvailable),
+		ProvisionedConcurrencyAllocated:  aws.ToInt32(output.ProvisionedConcurrencyAllocated),
+		Status:                           output.Status,
+		StatusReason:                     aws.ToString(output.StatusReason),
+		LastModified:                     aws.ToString(output.LastModified),
+	}, nil
+}
+
+// GetProvisionedConcurrency gets the provisioned concurrency configuration and fails the test if an error occurs
+func GetProvisionedConcurrency(ctx *TestContext, functionName, qualifier string) *ProvisionedConcurrencyResult {
+	result, err := GetProvisionedConcurrencyE(ctx, functionName, qualifier)
+	if err != nil {
+		ctx.T.Fatalf("Failed to get provisioned concurrency: %v", err)
+	}
+	return result
+}
+
+// GetProvisionedConcurrencyE gets the provisioned concurrency configuration and returns any error
+func GetProvisionedConcurrencyE(ctx *TestContext, functionName, qualifier string) (*ProvisionedConcurrencyResult, error) {
+	if err := validateFunctionName(functionName); err != nil {
+		return nil, fmt.Errorf("invalid function name: %w", err)
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.GetProvisionedConcurrencyConfigInput{
+		FunctionName: aws.String(functionName),
+		Qualifier:    aws.String(qualifier),
+	}
+
+	output, err := client.GetProvisionedConcurrencyConfig(context.Background(), input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get provisioned concurrency: %w", err)
+	}
+
+	return &ProvisionedConcurrencyResult{
+		FunctionArn:                      aws.ToString(output.FunctionArn),
+		Qualifier:                        aws.ToString(output.Qualifier),
+		ProvisionedConcurrencyRequested:  aws.ToInt32(output.ProvisionedConcurrencyRequested),
+		ProvisionedConcurrencyAvailable:  aws.ToInt32(output.ProvisionedConcurrencyAvailable),
+		ProvisionedConcurrencyAllocated:  aws.ToInt32(output.ProvisionedConcurrencyAllocated),
+		Status:                           output.Status,
+		StatusReason:                     aws.ToString(output.StatusReason),
+		LastModified:                     aws.ToString(output.LastModified),
+	}, nil
+}
+
+// DeleteProvisionedConcurrency deletes the provisioned concurrency configuration and fails the test if an error occurs
+func DeleteProvisionedConcurrency(ctx *TestContext, functionName, qualifier string) {
+	err := DeleteProvisionedConcurrencyE(ctx, functionName, qualifier)
+	if err != nil {
+		ctx.T.Fatalf("Failed to delete provisioned concurrency: %v", err)
+	}
+}
+
+// DeleteProvisionedConcurrencyE deletes the provisioned concurrency configuration and returns any error
+func DeleteProvisionedConcurrencyE(ctx *TestContext, functionName, qualifier string) error {
+	if err := validateFunctionName(functionName); err != nil {
+		return fmt.Errorf("invalid function name: %w", err)
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.DeleteProvisionedConcurrencyConfigInput{
+		FunctionName: aws.String(functionName),
+		Qualifier:    aws.String(qualifier),
+	}
+
+	_, err := client.DeleteProvisionedConcurrencyConfig(context.Background(), input)
+	if err != nil {
+		return fmt.Errorf("failed to delete provisioned concurrency: %w", err)
+	}
+
+	return nil
+}
+
+// =============================================================================
+// RESERVED CONCURRENCY CONFIGURATION
+// =============================================================================
+
+// ReservedConcurrencyConfig represents reserved concurrency configuration
+type ReservedConcurrencyConfig struct {
+	FunctionName           string
+	ReservedConcurrency    int32
+}
+
+// ReservedConcurrencyResult represents the result of reserved concurrency operations
+type ReservedConcurrencyResult struct {
+	FunctionArn         string
+	ReservedConcurrency int32
+}
+
+// PutReservedConcurrency sets the reserved concurrency and fails the test if an error occurs
+func PutReservedConcurrency(ctx *TestContext, config ReservedConcurrencyConfig) *ReservedConcurrencyResult {
+	result, err := PutReservedConcurrencyE(ctx, config)
+	if err != nil {
+		ctx.T.Fatalf("Failed to put reserved concurrency: %v", err)
+	}
+	return result
+}
+
+// PutReservedConcurrencyE sets the reserved concurrency and returns any error
+func PutReservedConcurrencyE(ctx *TestContext, config ReservedConcurrencyConfig) (*ReservedConcurrencyResult, error) {
+	if err := validateFunctionName(config.FunctionName); err != nil {
+		return nil, fmt.Errorf("invalid function name: %w", err)
+	}
+
+	if config.ReservedConcurrency < 0 {
+		return nil, fmt.Errorf("reserved concurrency cannot be negative")
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.PutReservedConcurrencyInput{
+		FunctionName:        aws.String(config.FunctionName),
+		ReservedConcurrency: aws.Int32(config.ReservedConcurrency),
+	}
+
+	output, err := client.PutReservedConcurrency(context.Background(), input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to put reserved concurrency: %w", err)
+	}
+
+	return &ReservedConcurrencyResult{
+		FunctionArn:         aws.ToString(output.FunctionArn),
+		ReservedConcurrency: aws.ToInt32(output.ReservedConcurrency),
+	}, nil
+}
+
+// GetReservedConcurrency gets the reserved concurrency and fails the test if an error occurs
+func GetReservedConcurrency(ctx *TestContext, functionName string) *ReservedConcurrencyResult {
+	result, err := GetReservedConcurrencyE(ctx, functionName)
+	if err != nil {
+		ctx.T.Fatalf("Failed to get reserved concurrency: %v", err)
+	}
+	return result
+}
+
+// GetReservedConcurrencyE gets the reserved concurrency and returns any error
+func GetReservedConcurrencyE(ctx *TestContext, functionName string) (*ReservedConcurrencyResult, error) {
+	if err := validateFunctionName(functionName); err != nil {
+		return nil, fmt.Errorf("invalid function name: %w", err)
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.GetReservedConcurrencyInput{
+		FunctionName: aws.String(functionName),
+	}
+
+	output, err := client.GetReservedConcurrency(context.Background(), input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reserved concurrency: %w", err)
+	}
+
+	return &ReservedConcurrencyResult{
+		FunctionArn:         aws.ToString(output.FunctionArn),
+		ReservedConcurrency: aws.ToInt32(output.ReservedConcurrency),
+	}, nil
+}
+
+// DeleteReservedConcurrency removes the reserved concurrency and fails the test if an error occurs
+func DeleteReservedConcurrency(ctx *TestContext, functionName string) {
+	err := DeleteReservedConcurrencyE(ctx, functionName)
+	if err != nil {
+		ctx.T.Fatalf("Failed to delete reserved concurrency: %v", err)
+	}
+}
+
+// DeleteReservedConcurrencyE removes the reserved concurrency and returns any error
+func DeleteReservedConcurrencyE(ctx *TestContext, functionName string) error {
+	if err := validateFunctionName(functionName); err != nil {
+		return fmt.Errorf("invalid function name: %w", err)
+	}
+
+	client := createLambdaClient(ctx)
+	
+	input := &lambda.DeleteReservedConcurrencyInput{
+		FunctionName: aws.String(functionName),
+	}
+
+	_, err := client.DeleteReservedConcurrency(context.Background(), input)
+	if err != nil {
+		return fmt.Errorf("failed to delete reserved concurrency: %w", err)
+	}
+
+	return nil
+}
+
 // validateLayerName validates that the layer name follows AWS naming conventions
 func validateLayerName(layerName string) error {
 	if layerName == "" {

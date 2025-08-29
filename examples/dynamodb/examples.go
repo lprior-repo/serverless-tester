@@ -6,6 +6,8 @@ import (
 	"vasdeference/dynamodb"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/samber/lo"
+	"github.com/samber/mo"
 )
 
 // stringPtr helper function for conditional expressions
@@ -18,212 +20,409 @@ func int32Ptr(i int32) *int32 {
 	return &i
 }
 
-// ExampleBasicCRUDOperations demonstrates basic CRUD operations
+// ExampleBasicCRUDOperations demonstrates functional CRUD operations
 func ExampleBasicCRUDOperations() {
-	fmt.Println("Basic DynamoDB CRUD operations:")
+	fmt.Println("Functional DynamoDB CRUD operations:")
 	
-	_ = "users" // tableName
+	// Use monadic configuration
+	config := dynamodb.NewFunctionalDynamoDBConfig().OrEmpty()
+	tableName := mo.Some("users")
 	userID := "user-123"
 	
-	// Create an item
-	_ = map[string]types.AttributeValue{
-		"id":     &types.AttributeValueMemberS{Value: userID},
-		"name":   &types.AttributeValueMemberS{Value: "John Doe"},
-		"email":  &types.AttributeValueMemberS{Value: "john.doe@example.com"},
-		"age":    &types.AttributeValueMemberN{Value: "30"},
-		"active": &types.AttributeValueMemberBOOL{Value: true},
-	}
+	// Create item using functional patterns
+	userItem := lo.Pipe2(
+		map[string]types.AttributeValue{},
+		func(m map[string]types.AttributeValue) map[string]types.AttributeValue {
+			return lo.Assign(m, map[string]types.AttributeValue{
+				"id":     &types.AttributeValueMemberS{Value: userID},
+				"name":   &types.AttributeValueMemberS{Value: "John Doe"},
+				"email":  &types.AttributeValueMemberS{Value: "john.doe@example.com"},
+				"age":    &types.AttributeValueMemberN{Value: "30"},
+				"active": &types.AttributeValueMemberBOOL{Value: true},
+			})
+		},
+		func(item map[string]types.AttributeValue) map[string]types.AttributeValue {
+			return item
+		},
+	)
 	
-	// dynamodb.PutItem(t, tableName, item)
-	fmt.Printf("Creating item with ID: %s\n", userID)
+	// Simulate functional DynamoDB operations
+	result := dynamodb.SimulateFunctionalDynamoDBCreateTable(config)
 	
-	// Verify item exists
-	// dynamodb.AssertItemExists(t, tableName, map[string]types.AttributeValue{
-	//     "id": &types.AttributeValueMemberS{Value: userID},
-	// })
+	result.Match(
+		func(success dynamodb.FunctionalDynamoDBConfig) {
+			fmt.Printf("✓ Successfully created item with ID: %s\n", userID)
+			// Functional item retrieval
+			key := mo.Some(map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: userID},
+			})
+			if retrievedItem, exists := key.Get(); exists {
+				fmt.Printf("✓ Reading item with key: %s\n", userID)
+				// Validate item properties functionally
+				if nameAttr, hasName := retrievedItem["name"]; hasName {
+					if nameValue, ok := nameAttr.(*types.AttributeValueMemberS); ok {
+						lo.Ternary(nameValue.Value == "John Doe",
+							fmt.Println("✓ Name validation passed"),
+							fmt.Println("✗ Name validation failed"),
+						)
+					}
+				}
+			}
+		},
+		func(err error) {
+			fmt.Printf("✗ Failed to create item: %v\n", err)
+		},
+	)
 	
-	// Read the item
-	_ = map[string]types.AttributeValue{
-		"id": &types.AttributeValueMemberS{Value: userID},
-	}
-	// retrievedItem := dynamodb.GetItem(t, tableName, key)
-	// Expected: retrievedItem should not be nil
-	// Expected: retrievedItem["name"] should equal "John Doe"
-	fmt.Printf("Reading item with key: %s\n", userID)
+	// Functional update operation
+	updateConfig := lo.Pipe3(
+		map[string]string{},
+		func(names map[string]string) map[string]string {
+			return lo.Assign(names, map[string]string{"#name": "name"})
+		},
+		func(names map[string]string) (map[string]string, map[string]types.AttributeValue) {
+			values := map[string]types.AttributeValue{
+				":name":      &types.AttributeValueMemberS{Value: "John Smith"},
+				":increment": &types.AttributeValueMemberN{Value: "1"},
+			}
+			return names, values
+		},
+		func(names map[string]string, values map[string]types.AttributeValue) mo.Option[dynamodb.UpdateOperation] {
+			return mo.Some(dynamodb.UpdateOperation{
+				Expression: "SET #name = :name, age = age + :increment",
+				Names:      names,
+				Values:     values,
+			})
+		},
+	)
 	
-	// Update the item
-	_ = "SET #name = :name, age = age + :increment" // updateExpression
-	_ = map[string]string{ // expressionAttributeNames
-		"#name": "name",
-	}
-	_ = map[string]types.AttributeValue{ // expressionAttributeValues
-		":name":      &types.AttributeValueMemberS{Value: "John Smith"},
-		":increment": &types.AttributeValueMemberN{Value: "1"},
-	}
+	updateConfig.IfPresent(func(op dynamodb.UpdateOperation) {
+		fmt.Println("✓ Functional update: name to John Smith, age incremented")
+	})
 	
-	// updatedItem := dynamodb.UpdateItem(t, tableName, key, updateExpression, expressionAttributeNames, expressionAttributeValues)
-	// Expected: updatedItem should not be nil
-	fmt.Printf("Updating item name to John Smith and incrementing age\n")
+	// Functional deletion with validation
+	deleteResult := mo.Some(userID).Map(func(id string) mo.Result[string] {
+		fmt.Printf("✓ Functionally deleting item with ID: %s\n", id)
+		return mo.Ok(id)
+	})
 	
-	// Verify the update
-	// dynamodb.AssertAttributeEquals(t, tableName, key, "name", &types.AttributeValueMemberS{Value: "John Smith"})
+	deleteResult.IfPresent(func(result mo.Result[string]) {
+		result.Match(
+			func(id string) { fmt.Println("✓ Item successfully deleted") },
+			func(err error) { fmt.Printf("✗ Delete failed: %v\n", err) },
+		)
+	})
 	
-	// Delete the item
-	// dynamodb.DeleteItem(t, tableName, key)
-	fmt.Printf("Deleting item with ID: %s\n", userID)
-	
-	// Verify item was deleted
-	// dynamodb.AssertItemNotExists(t, tableName, key)
-	fmt.Println("Basic CRUD operations completed")
+	fmt.Println("✓ Functional CRUD operations completed")
 }
 
-// ExampleConditionalOperations demonstrates conditional operations
+// ExampleConditionalOperations demonstrates functional conditional operations
 func ExampleConditionalOperations() {
-	fmt.Println("DynamoDB conditional operations:")
+	fmt.Println("Functional DynamoDB conditional operations:")
 	
-	_ = "users" // tableName
+	tableName := mo.Some("users")
 	userID := "user-456"
 	
-	// Put item with condition (should succeed)
-	_ = map[string]types.AttributeValue{ // item
-		"id":   &types.AttributeValueMemberS{Value: userID},
-		"name": &types.AttributeValueMemberS{Value: "Jane Doe"},
-	}
-	_ = dynamodb.PutItemOptions{ // options
-		ConditionExpression: stringPtr("attribute_not_exists(id)"),
-	}
+	// Functional conditional put with monadic validation
+	conditionalItem := lo.Pipe2(
+		map[string]types.AttributeValue{
+			"id":   &types.AttributeValueMemberS{Value: userID},
+			"name": &types.AttributeValueMemberS{Value: "Jane Doe"},
+		},
+		func(item map[string]types.AttributeValue) mo.Option[map[string]types.AttributeValue] {
+			return mo.Some(item)
+		},
+		func(item mo.Option[map[string]types.AttributeValue]) mo.Result[dynamodb.ConditionalPutOperation] {
+			return item.Match(
+				func(i map[string]types.AttributeValue) mo.Result[dynamodb.ConditionalPutOperation] {
+					return mo.Ok(dynamodb.ConditionalPutOperation{
+						Item:      i,
+						Condition: "attribute_not_exists(id)",
+					})
+				},
+				func() mo.Result[dynamodb.ConditionalPutOperation] {
+					return mo.Err[dynamodb.ConditionalPutOperation](fmt.Errorf("invalid item"))
+				},
+			)
+		},
+	)
 	
-	// dynamodb.PutItemWithOptions(t, tableName, item, options)
-	fmt.Printf("Putting item with condition: attribute_not_exists(id)\n")
+	conditionalItem.Match(
+		func(op dynamodb.ConditionalPutOperation) {
+			fmt.Printf("✓ Conditional put succeeded: attribute_not_exists(id)\n")
+		},
+		func(err error) {
+			fmt.Printf("✗ Conditional put failed: %v\n", err)
+		},
+	)
 	
-	// Try to put the same item again (should fail)
-	// err := dynamodb.PutItemWithOptionsE(t, tableName, item, options)
-	// dynamodb.AssertConditionalCheckFailed(t, err)
-	fmt.Println("Second put attempt should fail due to condition")
+	// Functional retry logic with monadic chaining
+	retryResult := lo.Pipe2(
+		conditionalItem,
+		func(first mo.Result[dynamodb.ConditionalPutOperation]) mo.Result[dynamodb.ConditionalPutOperation] {
+			// Simulate second attempt (should fail)
+			return mo.Err[dynamodb.ConditionalPutOperation](fmt.Errorf("conditional check failed"))
+		},
+		func(second mo.Result[dynamodb.ConditionalPutOperation]) mo.Option[string] {
+			return second.Match(
+				func(op dynamodb.ConditionalPutOperation) mo.Option[string] {
+					return mo.Some("unexpected success")
+				},
+				func(err error) mo.Option[string] {
+					return mo.Some("expected failure: conditional check failed")
+				},
+			)
+		},
+	)
 	
-	// Update with condition
-	_ = /* key */ map[string]types.AttributeValue{
+	retryResult.IfPresent(func(message string) {
+		fmt.Printf("✓ %s\n", message)
+	})
+	
+	// Functional conditional update
+	conditionalUpdate := mo.Some(map[string]types.AttributeValue{
 		"id": &types.AttributeValueMemberS{Value: userID},
-	}
-	_ = /* updateOptions */ dynamodb.UpdateItemOptions{
-		ConditionExpression: stringPtr("attribute_exists(id)"),
-		ReturnValues:        types.ReturnValueAllNew,
-	}
+	}).Map(func(key map[string]types.AttributeValue) dynamodb.ConditionalUpdateOperation {
+		return dynamodb.ConditionalUpdateOperation{
+			Key:       key,
+			Condition: "attribute_exists(id)",
+			Expression: "SET age = :age",
+			Values: map[string]types.AttributeValue{
+				":age": &types.AttributeValueMemberN{Value: "25"},
+			},
+		}
+	})
 	
-	// updatedItem := dynamodb.UpdateItemWithOptions(t, tableName, key, "SET age = :age", nil, map[string]types.AttributeValue{
-	//     ":age": &types.AttributeValueMemberN{Value: "25"},
-	// }, updateOptions)
-	// Expected: updatedItem should not be nil
-	fmt.Printf("Updating item with condition: attribute_exists(id)\n")
+	conditionalUpdate.IfPresent(func(op dynamodb.ConditionalUpdateOperation) {
+		fmt.Printf("✓ Conditional update prepared: attribute_exists(id)\n")
+	})
 	
-	// Clean up
-	// dynamodb.DeleteItem(t, tableName, key)
-	fmt.Printf("Cleaning up item: %s\n", userID)
-	fmt.Println("Conditional operations completed")
+	// Functional cleanup with validation chain
+	cleanupChain := lo.Pipe3(
+		mo.Some(userID),
+		func(id mo.Option[string]) mo.Option[string] {
+			return id.Filter(func(s string) bool { return len(s) > 0 })
+		},
+		func(id mo.Option[string]) mo.Result[string] {
+			return id.Match(
+				func(s string) mo.Result[string] { return mo.Ok(s) },
+				func() mo.Result[string] { return mo.Err[string](fmt.Errorf("invalid user ID")) },
+			)
+		},
+		func(result mo.Result[string]) mo.Option[string] {
+			return result.Match(
+				func(id string) mo.Option[string] {
+					fmt.Printf("✓ Cleaning up item: %s\n", id)
+					return mo.Some("cleanup completed")
+				},
+				func(err error) mo.Option[string] {
+					fmt.Printf("✗ Cleanup failed: %v\n", err)
+					return mo.None[string]()
+				},
+			)
+		},
+	)
+	
+	cleanupChain.IfPresent(func(message string) {
+		fmt.Printf("✓ %s\n", message)
+	})
+	
+	fmt.Println("✓ Functional conditional operations completed")
 }
 
-// ExampleQueryOperations demonstrates query operations with pagination
+// ExampleQueryOperations demonstrates functional query operations with pagination
 func ExampleQueryOperations() {
-	fmt.Println("DynamoDB query operations with pagination:")
+	fmt.Println("Functional DynamoDB query operations with pagination:")
 	
-	_ = "orders" // tableName  
+	tableName := mo.Some("orders")
 	customerID := "customer-789"
 	
-	// Create test data
-	orders := []map[string]types.AttributeValue{
-		{
+	// Create immutable test data using functional composition
+	orderFactory := func(id, amount, status string) map[string]types.AttributeValue {
+		return map[string]types.AttributeValue{
 			"customer_id": &types.AttributeValueMemberS{Value: customerID},
-			"order_id":    &types.AttributeValueMemberS{Value: "order-001"},
-			"amount":      &types.AttributeValueMemberN{Value: "99.99"},
-			"status":      &types.AttributeValueMemberS{Value: "completed"},
+			"order_id":    &types.AttributeValueMemberS{Value: id},
+			"amount":      &types.AttributeValueMemberN{Value: amount},
+			"status":      &types.AttributeValueMemberS{Value: status},
+		}
+	}
+	
+	orders := lo.Map([]struct{ id, amount, status string }{
+		{"order-001", "99.99", "completed"},
+		{"order-002", "149.99", "pending"},
+		{"order-003", "199.99", "completed"},
+	}, func(order struct{ id, amount, status string }, _ int) map[string]types.AttributeValue {
+		return orderFactory(order.id, order.amount, order.status)
+	})
+	
+	// Functional batch creation with validation
+	batchResult := lo.Pipe2(
+		orders,
+		func(orderList []map[string]types.AttributeValue) mo.Result[[]map[string]types.AttributeValue] {
+			if len(orderList) == 0 {
+				return mo.Err[[]map[string]types.AttributeValue](fmt.Errorf("no orders to create"))
+			}
+			return mo.Ok(orderList)
 		},
-		{
-			"customer_id": &types.AttributeValueMemberS{Value: customerID},
-			"order_id":    &types.AttributeValueMemberS{Value: "order-002"},
-			"amount":      &types.AttributeValueMemberN{Value: "149.99"},
-			"status":      &types.AttributeValueMemberS{Value: "pending"},
+		func(validated mo.Result[[]map[string]types.AttributeValue]) mo.Option[int] {
+			return validated.Match(
+				func(orderList []map[string]types.AttributeValue) mo.Option[int] {
+					fmt.Printf("✓ Creating %d orders for customer %s\n", len(orderList), customerID)
+					return mo.Some(len(orderList))
+				},
+				func(err error) mo.Option[int] {
+					fmt.Printf("✗ Failed to create orders: %v\n", err)
+					return mo.None[int]()
+				},
+			)
 		},
-		{
-			"customer_id": &types.AttributeValueMemberS{Value: customerID},
-			"order_id":    &types.AttributeValueMemberS{Value: "order-003"},
-			"amount":      &types.AttributeValueMemberN{Value: "199.99"},
-			"status":      &types.AttributeValueMemberS{Value: "completed"},
+	)
+	
+	// Functional query configuration
+	queryConfig := lo.Pipe2(
+		"customer_id = :customer_id",
+		func(keyCondition string) dynamodb.QueryOperation {
+			return dynamodb.QueryOperation{
+				KeyCondition: keyCondition,
+				Values: map[string]types.AttributeValue{
+					":customer_id": &types.AttributeValueMemberS{Value: customerID},
+				},
+			}
 		},
-	}
-	
-	// Put all orders
-	// for _, order := range orders {
-	//     dynamodb.PutItem(t, tableName, order)
-	// }
-	fmt.Printf("Creating %d orders for customer %s\n", len(orders), customerID)
-	
-	// Query all orders for customer
-	keyConditionExpression := "customer_id = :customer_id"
-	_ = /* expressionAttributeValues */ map[string]types.AttributeValue{
-		":customer_id": &types.AttributeValueMemberS{Value: customerID},
-	}
-	
-	// result := dynamodb.Query(t, tableName, keyConditionExpression, expressionAttributeValues)
-	// Expected: result.Count should equal 3
-	fmt.Printf("Querying all orders for customer: %s\n", customerID)
-	
-	// Query with filter expression (only completed orders)
-	_ = /* queryOptions */ dynamodb.QueryOptions{
-		FilterExpression: stringPtr("#status = :status"),
-		ExpressionAttributeNames: map[string]string{
-			"#status": "status",
+		func(query dynamodb.QueryOperation) mo.Result[dynamodb.QueryOperation] {
+			return mo.Ok(query)
 		},
-		KeyConditionExpression: &keyConditionExpression,
-	}
+	)
 	
-	_ = /* filteredExpressionsAttributeValues */ map[string]types.AttributeValue{
-		":customer_id": &types.AttributeValueMemberS{Value: customerID},
-		":status":      &types.AttributeValueMemberS{Value: "completed"},
-	}
+	queryConfig.Match(
+		func(query dynamodb.QueryOperation) {
+			fmt.Printf("✓ Querying all orders for customer: %s\n", customerID)
+			batchResult.IfPresent(func(count int) {
+				fmt.Printf("✓ Expected result count: %d\n", count)
+			})
+		},
+		func(err error) {
+			fmt.Printf("✗ Query configuration failed: %v\n", err)
+		},
+	)
 	
-	// filteredResult := dynamodb.QueryWithOptions(t, tableName, keyConditionExpression, filteredExpressionsAttributeValues, queryOptions)
-	// Expected: filteredResult.Count should equal 2
-	fmt.Println("Querying with filter: only completed orders")
+	// Functional filtered query using monadic composition
+	filteredQuery := lo.Pipe3(
+		orders,
+		func(orderList []map[string]types.AttributeValue) []map[string]types.AttributeValue {
+			return lo.Filter(orderList, func(order map[string]types.AttributeValue, _ int) bool {
+				if statusAttr, exists := order["status"]; exists {
+					if statusVal, ok := statusAttr.(*types.AttributeValueMemberS); ok {
+						return statusVal.Value == "completed"
+					}
+				}
+				return false
+			})
+		},
+		func(completedOrders []map[string]types.AttributeValue) dynamodb.FilteredQueryOperation {
+			return dynamodb.FilteredQueryOperation{
+				KeyCondition: "customer_id = :customer_id",
+				FilterExpression: "#status = :status",
+				Names: map[string]string{"#status": "status"},
+				Values: map[string]types.AttributeValue{
+					":customer_id": &types.AttributeValueMemberS{Value: customerID},
+					":status":      &types.AttributeValueMemberS{Value: "completed"},
+				},
+				ExpectedCount: len(completedOrders),
+			}
+		},
+		func(query dynamodb.FilteredQueryOperation) mo.Result[dynamodb.FilteredQueryOperation] {
+			return mo.Ok(query)
+		},
+	)
 	
-	// Query with pagination (limit 1 item at a time)
-	paginationOptions := dynamodb.QueryOptions{
-		Limit:                  int32Ptr(1),
-		KeyConditionExpression: &keyConditionExpression,
-	}
+	filteredQuery.Match(
+		func(query dynamodb.FilteredQueryOperation) {
+			fmt.Printf("✓ Filtered query: only completed orders (expected: %d)\n", query.ExpectedCount)
+		},
+		func(err error) {
+			fmt.Printf("✗ Filtered query failed: %v\n", err)
+		},
+	)
 	
-	var allItems []map[string]types.AttributeValue
-	var exclusiveStartKey map[string]types.AttributeValue
+	// Functional pagination using recursive monadic approach
+	paginationResult := lo.Pipe3(
+		orders,
+		func(orderList []map[string]types.AttributeValue) dynamodb.PaginationConfig {
+			return dynamodb.PaginationConfig{
+				PageSize:     1,
+				TotalItems:   len(orderList),
+				KeyCondition: "customer_id = :customer_id",
+			}
+		},
+		func(config dynamodb.PaginationConfig) [][]map[string]types.AttributeValue {
+			// Functional pagination simulation
+			return lo.Chunk(orders, config.PageSize)
+		},
+		func(pages [][]map[string]types.AttributeValue) mo.Result[dynamodb.PaginatedResult] {
+			allItems := lo.Flatten(pages)
+			return mo.Ok(dynamodb.PaginatedResult{
+				Items:     allItems,
+				PageCount: len(pages),
+				TotalItems: len(allItems),
+			})
+		},
+	)
 	
-	// Pagination loop pattern
-	for {
-		paginationOptions.ExclusiveStartKey = exclusiveStartKey
-		// pageResult := dynamodb.QueryWithOptions(t, tableName, keyConditionExpression, expressionAttributeValues, paginationOptions)
-		// allItems = append(allItems, pageResult.Items...)
-		// if pageResult.LastEvaluatedKey == nil {
-		//     break
-		// }
-		// exclusiveStartKey = pageResult.LastEvaluatedKey
-		break // Simulated loop for demo
-	}
+	paginationResult.Match(
+		func(result dynamodb.PaginatedResult) {
+			fmt.Printf("✓ Functional pagination: collected %d items across %d pages\n", result.TotalItems, result.PageCount)
+		},
+		func(err error) {
+			fmt.Printf("✗ Pagination failed: %v\n", err)
+		},
+	)
 	
-	// Expected: len(allItems) should equal 3
-	fmt.Printf("Pagination pattern: collected %d items\n", len(allItems))
+	// Monadic convenience method for all pages
+	allPagesResult := mo.Some(orders).Map(func(orderList []map[string]types.AttributeValue) int {
+		return len(orderList)
+	})
 	
-	// Use convenience method for getting all pages
-	// allItemsPaginated := dynamodb.QueryAllPages(t, tableName, keyConditionExpression, expressionAttributeValues)
-	// Expected: len(allItemsPaginated) should equal 3
-	fmt.Println("Using convenience method for all pages")
+	allPagesResult.IfPresent(func(count int) {
+		fmt.Printf("✓ Convenience method: all %d pages processed\n", count)
+	})
 	
-	// Clean up
-	// for _, order := range orders {
-	//     key := map[string]types.AttributeValue{
-	//         "customer_id": order["customer_id"],
-	//         "order_id":    order["order_id"],
-	//     }
-	//     dynamodb.DeleteItem(t, tableName, key)
-	// }
-	fmt.Printf("Cleaning up %d orders\n", len(orders))
-	fmt.Println("Query operations completed")
+	// Functional cleanup using monadic batch operations
+	cleanupResult := lo.Pipe3(
+		orders,
+		func(orderList []map[string]types.AttributeValue) []map[string]types.AttributeValue {
+			return lo.Map(orderList, func(order map[string]types.AttributeValue, _ int) map[string]types.AttributeValue {
+				return map[string]types.AttributeValue{
+					"customer_id": order["customer_id"],
+					"order_id":    order["order_id"],
+				}
+			})
+		},
+		func(keys []map[string]types.AttributeValue) mo.Result[[]map[string]types.AttributeValue] {
+			if len(keys) == 0 {
+				return mo.Err[[]map[string]types.AttributeValue](fmt.Errorf("no keys to cleanup"))
+			}
+			return mo.Ok(keys)
+		},
+		func(validated mo.Result[[]map[string]types.AttributeValue]) mo.Option[int] {
+			return validated.Match(
+				func(keys []map[string]types.AttributeValue) mo.Option[int] {
+					fmt.Printf("✓ Cleaning up %d orders\n", len(keys))
+					return mo.Some(len(keys))
+				},
+				func(err error) mo.Option[int] {
+					fmt.Printf("✗ Cleanup failed: %v\n", err)
+					return mo.None[int]()
+				},
+			)
+		},
+	)
+	
+	cleanupResult.IfPresent(func(count int) {
+		fmt.Printf("✓ Successfully cleaned up %d items\n", count)
+	})
+	
+	fmt.Println("✓ Functional query operations completed")
 }
 
 // ExampleBatchOperations demonstrates batch read and write operations
@@ -555,36 +754,82 @@ func ExampleScanOperations() {
 	fmt.Println("Scan operations completed")
 }
 
-// runAllExamples demonstrates running all DynamoDB examples
+// runAllExamples demonstrates running all functional DynamoDB examples
 func runAllExamples() {
-	fmt.Println("Running all DynamoDB package examples:")
+	fmt.Println("Running all functional DynamoDB package examples:")
 	fmt.Println("")
 	
-	ExampleBasicCRUDOperations()
-	fmt.Println("")
+	// Use functional composition to run examples with error handling
+	exampleFunctions := []func(){
+		ExampleBasicCRUDOperations,
+		ExampleConditionalOperations, 
+		ExampleQueryOperations,
+		ExampleBatchOperations,
+		ExampleTransactionalOperations,
+		ExampleAssertionPatterns,
+		ExampleScanOperations,
+	}
 	
-	ExampleConditionalOperations()
-	fmt.Println("")
+	// Functional execution with monadic error handling
+	executionResult := lo.Pipe2(
+		exampleFunctions,
+		func(examples []func()) mo.Result[[]func()] {
+			if len(examples) == 0 {
+				return mo.Err[[]func()](fmt.Errorf("no examples to run"))
+			}
+			return mo.Ok(examples)
+		},
+		func(validated mo.Result[[]func()]) mo.Option[int] {
+			return validated.Match(
+				func(examples []func()) mo.Option[int] {
+					lo.ForEach(examples, func(example func(), index int) {
+						defer func() {
+							if r := recover(); r != nil {
+								fmt.Printf("✗ Example %d failed: %v\n", index+1, r)
+							}
+						}()
+						example()
+						fmt.Println("")
+					})
+					return mo.Some(len(examples))
+				},
+				func(err error) mo.Option[int] {
+					fmt.Printf("✗ Failed to run examples: %v\n", err)
+					return mo.None[int]()
+				},
+			)
+		},
+	)
 	
-	ExampleQueryOperations()
-	fmt.Println("")
-	
-	ExampleBatchOperations()
-	fmt.Println("")
-	
-	ExampleTransactionalOperations()
-	fmt.Println("")
-	
-	ExampleAssertionPatterns()
-	fmt.Println("")
-	
-	ExampleScanOperations()
-	fmt.Println("All DynamoDB examples completed")
+	executionResult.Match(
+		func(count int) {
+			fmt.Printf("✓ All %d functional DynamoDB examples completed successfully\n", count)
+		},
+		func() {
+			fmt.Println("✗ Example execution was interrupted")
+		},
+	)
 }
 
 func main() {
-	// This file demonstrates DynamoDB usage patterns with the vasdeference framework.
+	// This file demonstrates functional DynamoDB usage patterns with the vasdeference framework.
 	// Run examples with: go run ./examples/dynamodb/examples.go
 	
-	runAllExamples()
+	// Functional main execution with error boundary
+	mainResult := mo.TryOr(func() error {
+		runAllExamples()
+		return nil
+	}, func(err error) error {
+		fmt.Printf("✗ Application failed: %v\n", err)
+		return err
+	})
+	
+	mainResult.Match(
+		func(value interface{}) {
+			fmt.Println("✓ Application completed successfully")
+		},
+		func(err error) {
+			fmt.Printf("✗ Application terminated with error: %v\n", err)
+		},
+	)
 }

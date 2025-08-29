@@ -231,11 +231,25 @@ func ValidateReplayTimeRange(startTime time.Time, endTime time.Time) error {
 		return fmt.Errorf("replay end time cannot be in the future")
 	}
 
-	// Validate the range
-	config := ReplayConfig{
-		EventStartTime: startTime,
-		EventEndTime:   endTime,
+	// Validate the time range manually without creating a full ReplayConfig
+	// This avoids other validation errors from required fields
+	if endTime.Before(startTime) || endTime.Equal(startTime) {
+		return fmt.Errorf("end time must be after start time")
 	}
 
-	return ValidateReplayConfigE(config)
+	// Validate minimum duration
+	duration := endTime.Sub(startTime)
+	if duration.Seconds() < MinReplayDurationSeconds {
+		return fmt.Errorf("replay duration must be at least %d seconds, got %.0f seconds",
+			MinReplayDurationSeconds, duration.Seconds())
+	}
+
+	// Validate maximum duration
+	maxDuration := time.Duration(MaxReplayDurationHours) * time.Hour
+	if duration > maxDuration {
+		return fmt.Errorf("replay duration cannot exceed %d hours, got %.0f hours",
+			MaxReplayDurationHours, duration.Hours())
+	}
+
+	return nil
 }
